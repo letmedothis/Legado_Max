@@ -1,0 +1,56 @@
+{
+  "skill_name": "legado-dev",
+  "evals": [
+    {
+      "id": 1,
+      "name": "room-schema-data-preservation",
+      "prompt": "在 Bookmark 中增加可空 color: Long?，保证从当前正式数据库升级后已有书签不丢失。先检查 Room schema、迁移历史和测试，再实现；不要引入依赖，并准确报告验证边界。",
+      "expected_output": "选择与变更语义匹配的迁移方式，使用真实 appDb，保留历史迁移，补充数据保留迁移测试并诚实报告设备测试边界。",
+      "assertions": [
+        "修改前检查当前 AppDatabase 版本、导出 schema、自动迁移和手写迁移",
+        "不引用不存在的 AppDatabaseInstance，识别顶层 appDb",
+        "区分 AutoMigration、带 spec 的 AutoMigration 和手写 Migration",
+        "数据库版本递增且历史迁移链保留",
+        "同步 Entity 与 AppDatabase，并核对 DAO，仅在查询或写入受影响时修改 DAO",
+        "补充上一版本到新版本的数据保留迁移测试",
+        "行为变更遵循 RED-GREEN-REFACTOR",
+        "无法运行设备迁移测试时明确说明，不能夸大验证"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "compose-flow-cancellation",
+      "prompt": "新增纯 Compose URL 请求记录页面，持续收集数据库 Flow，筛选切换时取消上一次收集，清空失败显示一次性 Snackbar；不要迁移无关旧页面。先写测试再实现并验证。",
+      "expected_output": "复用 BaseComposeActivity 和项目主题，正确选择 viewModelScope/Flow 取消语义，以 StateFlow 和一次性事件连接 UI，并准确报告测试边界。",
+      "assertions": [
+        "发现并优先复用 BaseComposeActivity",
+        "纯 Compose 页面不创建无必要的 XML 或 ComposeView 混合壳",
+        "ViewModel 暴露 StateFlow，Snackbar 由一次性事件交给 UI",
+        "持续收集和可取消任务可合理使用 viewModelScope、flatMapLatest 或 Job",
+        "说明 execute 适合一次性 IO 而不是唯一协程入口",
+        "阻塞 IO 不在主线程运行",
+        "先增加筛选取消和一次性失败事件测试",
+        "只报告实际运行的测试、编译和其他验证"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "web-auth-assets-security",
+      "prompt": "为内嵌 Web 管理端增加受认证保护的书架摘要 API 和 Vue 按钮。不得把 token 写入 APK，不新增依赖；完成本地 Web 构建并显式同步 Android assets，准确说明本地与 CI 差异和验证边界。",
+      "expected_output": "将远程 API 视为高风险，保护认证值，正确描述独立 Web 工程和 GITHUB_ENV 同步条件，并对认证和资产流程执行风险匹配的验证。",
+      "assertions": [
+        "HttpServer、认证、CORS 和用户数据导出按高风险处理",
+        "BuildConfig 不被当成真实密钥的安全存储",
+        "覆盖未认证、错误 token 和正确 token 路径",
+        "检查 token 是否进入 URL、日志或错误响应，并检查 CORS",
+        "识别 modules/web 为独立 pnpm 工程而非 Gradle 模块",
+        "识别无 GITHUB_ENV 时本地 pnpm build 不自动同步 assets",
+        "API 行为与认证边界遵循 RED-GREEN-REFACTOR",
+        "分别报告 Web、资产和 Android 验证，不能声称未运行的矩阵通过"
+      ],
+      "files": []
+    }
+  ]
+}

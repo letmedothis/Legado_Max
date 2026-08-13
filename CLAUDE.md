@@ -51,43 +51,44 @@ gradlew assembleDebug --warning-mode all
 
 ### Web Frontend (modules/web)
 
-The embedded HTTP server's frontend is a Vue 3 + Vite app in `modules/web/`. It builds to `app/src/main/assets/web/vue/`.
+The embedded HTTP server's frontend is an independent Vue 3 + Vite app in `modules/web/`. A local production build writes `modules/web/dist/`. Its sync script copies to `app/src/main/assets/web/vue/` only when `GITHUB_ENV` is present; ordinary local builds do not update Android assets. When embedded assets must change, sync them explicitly and review the asset diff.
 
 ```bash
 cd modules/web
 pnpm install        # requires Node >= 20, pnpm >= 9
 pnpm dev            # local dev server with HMR
-pnpm build          # production build + syncs to assets/web/vue/
+pnpm build          # type-check + production build; local runs normally leave output in dist/
 pnpm lint:fix       # eslint auto-fix
 pnpm format         # prettier
 ```
 
 ## Architecture
 
-MVVM pattern with AndroidViewModel + ViewBinding + Coroutines.
+MVVM-style features use ViewModel/AndroidViewModel and Coroutines; XML/ViewBinding and Jetpack Compose coexist.
 
 ### Base Classes (`io.legado.app.base`)
 
-- `BaseActivity<VB>` — all Activities extend this. Manages theming, system bars, view binding. Override `observeLiveBus()` for event subscriptions (auto-cleaned on destroy).
+- `BaseActivity<VB>` — common base for XML/ViewBinding Activities. Manages theming, system bars, and view binding. Override `observeLiveBus()` for established event subscriptions (auto-cleaned on destroy).
 - `VMBaseActivity<VB, VM>` — adds abstract `viewModel` property.
+- `BaseComposeActivity` — preferred existing base to evaluate for new pure Compose Activities; use `ComposeView` only when progressively embedding Compose in an existing View-based page.
 - `BaseViewModel` — extends `AndroidViewModel`. Key method: `execute { }` returns a `Coroutine<T>` with chainable `.onSuccess`, `.onError`, `.onFinally`. Default context is `Dispatchers.IO`, callbacks on `Dispatchers.Main`.
 
 ### Key Patterns
 
-- **Coroutine helper**: `BaseViewModel.execute()` wraps `Coroutine.async()`. Use this instead of raw `viewModelScope.launch`.
-- **Event bus**: `LiveEventBus` for cross-component events. Subscribe via `observeEvent<T>(key) { ... }` in `observeLiveBus()`.
-- **Database**: Room (`AppDatabase` v100), singleton at `appDb`. DAOs in `data/`, entities in `data/entities/`. Uses KSP (not kapt).
+- **Coroutine helper**: use `BaseViewModel.execute()` for suitable one-shot IO with its chainable callbacks. Use `viewModelScope.launch` for lifecycle-bound Flow collection, structured concurrency, or work needing an explicit/cancellable `Job`; move blocking IO to an IO dispatcher.
+- **Events**: `LiveEventBus` exists for established cross-component events. For feature-local UI state and one-shot effects, follow the neighboring implementation and `UI-ARCHITECTURE`; ViewModels expose state/events and the UI performs Toast, Snackbar, navigation, sharing, and similar effects.
+- **Database**: Room, with the current version read from `AppDatabase`; the top-level database instance is `appDb`. DAOs are in `data/`, entities in `data/entities/`. Uses KSP (not kapt).
 - **Book source rules**: Rhino JS engine (`:modules:rhino` module) evaluates user-defined rules. The `analyzeRule` package in `model/` handles rule parsing.
 - **Singletons in model/**: `ReadBook`, `CacheBook`, `AudioPlay` manage global reading state.
 - **Config packages**: `TopBarConfig` and `BubblePackageManager` store configs as file system directories (JSON + assets like wallpapers/icons), not SharedPreferences. `NavigationBarConfig` uses SharedPreferences. `ApplicationThemeManager` combines all sub-configs into exportable/importable theme packages (zip).
 
 ### Modules
 
-The project has three library modules in `modules/`:
+The Gradle project currently has two library modules under `modules/`, plus an independent Web project:
 
 - `modules/book` — fork of epublib (EPUB parsing), package `me.ag2s.epublib`
 - `modules/rhino` — fork of Mozilla Rhino JS engine, package `com.script`. Evaluates user-defined book source rules at runtime.
-- `modules/web` — Vue 3 frontend for the embedded HTTP/WebSocket server (see above)
+- `modules/web` — independent Vue 3/pnpm frontend for the embedded HTTP/WebSocket server; it is not a Gradle module (see above)
 
 ### Source Layout
 
@@ -176,3 +177,8 @@ Skills 位于 `.claude/skills/` 目录，每个 skill 有独立的 `SKILL.md` �
 
 如果你认为哪怕只有 1% 的可能性某个 skill 适用于你正在做的事情，你必须调用该 skill 检查。
 <!-- superpowers-zh:end -->
+
+## 项目专属 Skill
+
+- **legado-dev**：修改、调试、审查、重构、测试或扩展 Legado_Max 时必须加载，入口位于 `.claude/skills/legado-dev/SKILL.md`。
+- **Git 授权边界**：执行 `legado-dev` 任务时，未经用户明确授权不得 stage、commit、push、发布或创建 PR；本项目专属规则优先于上方生成区中的自动本地提交说明。
