@@ -822,6 +822,7 @@
     <string name="text_menu_edit_title">Edit menu name</string>
     <string name="text_menu_edit_name">Menu name</string>
     <string name="text_menu_edit_name_desc">Leave blank to restore the default name</string>
+    <string name="text_menu_drag_sort">Drag to sort</string>
     <string name="process_text_menu_config">Other Apps Menu Config</string>
     <string name="process_text_menu_config_desc">Select the other apps menu items you want to display</string>
     <string name="no_process_text_apps">No apps found that support text processing</string>
@@ -2218,7 +2219,7 @@
 <string name="interface_manage">Interface Management</string>
 <string name="layout_mode">Layout Mode</string>
 <string name="load_cover_high_quality">Load high quality covers</string>
-<string name="load_cover_high_quality_summary">Use original cover images instead of smaller decoded covers</string>
+<string name="load_cover_high_quality_summary">When enabled, use original cover images; when disabled, prefer thumbnail loading</string>
 <string name="manual_config">Manual Config</string>
 <string name="nav_bar_summary">Click Apply button to apply config, click Edit button to edit config</string>
 <string name="nav_bar_summary_empty">No %s navigation bar configs, click below to add</string>

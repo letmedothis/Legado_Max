@@ -819,6 +819,7 @@
     <string name="text_menu_edit_title">修改菜单名称</string>
     <string name="text_menu_edit_name">菜单名称</string>
     <string name="text_menu_edit_name_desc">留空可恢复默认名称</string>
+    <string name="text_menu_drag_sort">拖动排序</string>
     <string name="process_text_menu_config">其他应用菜单配置</string>
     <string name="process_text_menu_config_desc">选择您想要显示的其他应用菜单项，Android 6.0以上系统支持此功能</string>
     <string name="no_process_text_apps">没有找到支持文本处理的应用</string>
@@ -2202,7 +2203,7 @@
 <string name="interface_manage">界面管理</string>
 <string name="layout_mode">布局模式</string>
 <string name="load_cover_high_quality">加载高清封面</string>
-<string name="load_cover_high_quality_summary">开启后使用封面原图，关闭时使用较小尺寸加载</string>
+<string name="load_cover_high_quality_summary">开启后使用封面原图，关闭时优先加载略缩图</string>
 <string name="manual_config">手动配置</string>
 <string name="nav_bar_summary">点击应用按钮应用底栏包，点击编辑按钮编辑底栏包</string>
 <string name="nav_bar_summary_empty">暂无%s底栏包，点击下方添加</string>
