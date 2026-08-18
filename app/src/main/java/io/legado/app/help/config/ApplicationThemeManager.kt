@@ -210,10 +210,15 @@ object ApplicationThemeManager {
      * @param options 导入选项，控制是否创建各子配置；null 表示全部创建
      */
     suspend fun importFile(file: File, options: ImportOptions? = null): Config {
-        val isZip = file.inputStream().use { input ->
-            input.read() == 'P'.code && input.read() == 'K'.code
+        // 检测 .red 格式（Reeden 阅读 App 主题包，RED 头 + ZIP 数据），剥离头部后作为 ZIP 处理
+        val zipFile = RedAssetPackage.zipPayload(file, RedAssetPackage.tempDir())
+        if (zipFile != null) {
+            val result = importZip(zipFile, options)
+            // 如果创建了临时文件（非原文件），导入完成后删除
+            if (zipFile != file) zipFile.delete()
+            return result
         }
-        if (isZip) return importZip(file, options)
+        // 不是 ZIP 也不是 .red，尝试作为纯 JSON 导入
         require(file.length() <= maxManifestBytes) { appCtx.getString(R.string.app_theme_file_too_large) }
         val imported = sanitize(
             GSON.fromJson(file.readText(), Config::class.java)
@@ -226,19 +231,23 @@ object ApplicationThemeManager {
         val temp = appCtx.cacheDir.resolve("applicationThemeImport/${System.currentTimeMillis()}").apply { mkdirs() }
         try {
             ZipFile(file).use { zip ->
-                // 检测 zip 包内的清单文件类型，兼容三种格式
+                // 检测 zip 包内的清单文件类型，兼容四种格式
                 val manifestEntry = zip.getEntry("application_theme.json")
                 val appearanceKitEntry = zip.entries().asSequence()
                     .firstOrNull { !it.isDirectory && (it.name == "appearance_kit.json" || it.name.endsWith("/appearance_kit.json")) }
                 val md3ManifestEntry = zip.getEntry("manifest.json")
+                // .red 格式的清单文件（Reeden 阅读 App 的主题包）
+                val redThemeEntry = zip.getEntry("theme.json")
 
                 when {
                     // 当前分支格式
                     manifestEntry != null -> return importNativeFormat(zip, temp, manifestEntry, options)
-                    // archive_primate_beta 分支格式
+                    // archive_primate_beta 分支格式（AppearanceKit）
                     appearanceKitEntry != null -> return AppearanceKitImporter.import(zip, temp, appearanceKitEntry, options)
                     // MD3-main 分支格式
                     md3ManifestEntry != null -> return Md3ThemeImporter.import(zip, temp, md3ManifestEntry, options)
+                    // .red 格式（Reeden 阅读 App 主题包）
+                    redThemeEntry != null -> return RedThemeImporter.import(zip, temp, redThemeEntry, options)
                     else -> throw IllegalArgumentException(appCtx.getString(R.string.app_theme_missing_manifest))
                 }
             }
