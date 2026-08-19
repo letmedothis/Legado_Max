@@ -38,10 +38,15 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
     private val binding by viewBinding(DialogBookGroupEditBinding::bind)
     private val viewModel by viewModels<GroupViewModel>()
     private var bookGroup: BookGroup? = null
+    private var selectedCoverPath: String? = null
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         val uri = it.uri ?: return@registerForActivityResult
         if (uri.scheme?.lowercase() in listOf("http", "https")) {
-            binding.ivCover.load(uri.toString())
+            selectedCoverPath = uri.toString()
+            binding.ivCover.load(
+                path = selectedCoverPath,
+                skipGallery = true
+            )
             return@registerForActivityResult
         }
         readUri(uri) { fileDoc, inputStream ->
@@ -59,7 +64,11 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
                 FileOutputStream(file).use { outputStream ->
                     inputStream.copyTo(outputStream)
                 }
-                binding.ivCover.load(file.absolutePath)
+                selectedCoverPath = file.absolutePath
+                binding.ivCover.load(
+                    path = selectedCoverPath,
+                    skipGallery = true
+                )
             } catch (e: Exception) {
                 appCtx.toastOnUi(e.localizedMessage)
             }
@@ -78,7 +87,11 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
         bookGroup?.let {
             binding.btnDelete.visible(it.groupId > 0 || it.groupId == Long.MIN_VALUE)
             binding.tieGroupName.setText(it.groupName)
-            binding.ivCover.load(it.cover)
+            selectedCoverPath = it.cover
+            binding.ivCover.load(
+                path = it.cover,
+                skipGallery = true
+            )
             if (it.bookSort + 1 !in 0..<binding.spSort.count) {
                 it.bookSort = -1
             }
@@ -92,7 +105,7 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
         }
         binding.run {
             ivCover.onClick {
-                if (!bookGroup?.cover.isNullOrEmpty()) {
+                if (!selectedCoverPath.isNullOrEmpty()) {
                     val actions = arrayListOf(
                         getString(R.string.select_image),
                         getString(R.string.delete)
@@ -102,7 +115,10 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
                             0 -> selectImage.launch {
                                 mode = HandleFileContract.IMAGE
                             }
-                            1 -> binding.ivCover.load()
+                            1 -> {
+                                selectedCoverPath = null
+                                binding.ivCover.load()
+                            }
                         }
                     }
                 } else {
@@ -120,7 +136,7 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
                     toastOnUi("分组名称不能为空")
                 } else {
                     val bookSort = binding.spSort.selectedItemPosition - 1
-                    val coverPath = binding.ivCover.bitmapPath
+                    val coverPath = selectedCoverPath
                     val enableRefresh = binding.cbEnableRefresh.isChecked
                     val onlyUpdateRead = binding.cbEnableOnlyRead.isChecked
                     bookGroup?.let {

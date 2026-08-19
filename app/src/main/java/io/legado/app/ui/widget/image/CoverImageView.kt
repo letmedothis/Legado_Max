@@ -407,7 +407,8 @@ class CoverImageView @JvmOverloads constructor(
     fun load(group: BookGroup) {
         load(
             path = group.cover,
-            galleryIdentity = "bookGroup:${group.groupId}"
+            galleryIdentity = "bookGroup:${group.groupId}",
+            skipGallery = !group.cover.isNullOrEmpty()
         )
     }
 
@@ -422,7 +423,8 @@ class CoverImageView @JvmOverloads constructor(
         galleryIdentity: String? = null,
         overrideWidth: Int = 0,
         overrideHeight: Int = 0,
-        onLoadFinish: (() -> Unit)? = null
+        onLoadFinish: (() -> Unit)? = null,
+        skipGallery: Boolean = false
     ) {
         updateCoverBackground()
         val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()?.also {
@@ -431,7 +433,7 @@ class CoverImageView @JvmOverloads constructor(
         val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()?.also {
             this.name = it
         }
-        val galleryDefaultCover = BookCover.getGalleryDefaultCover(
+        val galleryDefaultCover = if (skipGallery) null else BookCover.getGalleryDefaultCover(
             galleryIdentity ?: listOfNotNull(sourceOrigin, path, name, author).joinToString("|"),
             path
         )
