@@ -101,6 +101,10 @@ object HighlightRuleStore {
             group = rule.group.takeIf { it.isNotBlank() } ?: fallbackGroup,
             scope = rule.scope?.trim()?.takeIf { it.isNotBlank() },
             excludeScope = rule.excludeScope?.trim()?.takeIf { it.isNotBlank() },
+            layoutScope = rule.layoutScope?.trim()?.takeIf { it.isNotBlank() },
+            // GSON 用 Unsafe 实例化 data class 时不调用构造函数，
+            // 老规则 JSON 缺失 themeScope 字段时反序列化得到 0，应视为全部生效而非 coerceIn(1,3)=1（仅亮色）
+            themeScope = if (rule.themeScope in 1..3) rule.themeScope else HighlightRule.THEME_ALL,
         )
     }
 

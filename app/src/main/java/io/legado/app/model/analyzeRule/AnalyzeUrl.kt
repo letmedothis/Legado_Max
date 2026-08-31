@@ -422,6 +422,10 @@ class AnalyzeUrl(
         isTest: Boolean = false,
         skipRateLimit: Boolean = false
     ): StrResponse {
+        // Data URL 短路：解码后返回 hex 编码的字符串，不走 OkHttp / WebView。
+        // 必须返回 hex 编码以与 type 路径（HexUtil.encodeHexStr(getByteArrayAwait())）保持一致，
+        // 否则 JS 侧 hexDecodeToString() 会因遇到非 hex 字符而抛出异常。
+        getDataUrlHexContent()?.let { return it }
         if (type != null) {
             return StrResponse(url, HexUtil.encodeHexStr(getByteArrayAwait()))
         }
@@ -431,6 +435,58 @@ class AnalyzeUrl(
         concurrentRateLimiter.withLimit {
             return executeStrRequest(jsStr, sourceRegex, useWebView, isTest)
         }
+    }
+
+    /**
+     * 解析 Data URL 并返回 hex 编码的 StrResponse。
+     *
+     * 与 [getByteArrayAwait] + [HexUtil.encodeHexStr] 路径返回格式一致，
+     * 确保 JS 侧 `hexDecodeToString()` 能正常解码。
+     *
+     * 支持两种格式：
+     * - `data:text/html;charset=utf-8;base64,<base64>` — base64 编码
+     * - `data:text/html;charset=utf-8,<raw>` — 非 base64 的原始文本（percent-decoded）
+     *
+     * @return hex 编码的 StrResponse；如果当前 URL 不是 data URL 或解析失败则返回 null
+     */
+    private fun getDataUrlHexContent(): StrResponse? {
+        if (!urlNoQuery.startsWith("data:")) return null
+        val dataUriRegex = AppPattern.dataUriRegex
+        // 获取 data URL 声明的 charset，优先取选项中的 charset
+        val charsetName = charset ?: extractCharsetFromDataUrl(urlNoQuery) ?: "UTF-8"
+        val base64Match = dataUriRegex.find(urlNoQuery)
+        if (base64Match != null) {
+            val base64Data = base64Match.groupValues[1]
+            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+            return StrResponse(url, HexUtil.encodeHexStr(bytes))
+        }
+        // 非 base64 的 data URL：data:[<mediatype>][;charset=xxx],<data>
+        val commaIdx = urlNoQuery.indexOf(',')
+        if (commaIdx != -1) {
+            val raw = urlNoQuery.substring(commaIdx + 1)
+            // data URL 非基础编码部分使用 percent-encoding
+            val decoded = java.net.URLDecoder.decode(raw, charsetName)
+            return StrResponse(url, HexUtil.encodeHexStr(decoded.toByteArray(Charset.forName(charsetName))))
+        }
+        // 格式不合法的 data URL，返回空 body 避免崩溃
+        return StrResponse(url, HexUtil.encodeHexStr(ByteArray(0)))
+    }
+
+    /**
+     * 从 data URL 的 media type 部分提取 charset 参数。
+     * 例: `data:text/html;charset=utf-8;base64,...` → `utf-8`
+     */
+    private fun extractCharsetFromDataUrl(dataUrl: String): String? {
+        val commaIdx = dataUrl.indexOf(',')
+        val header = if (commaIdx != -1) dataUrl.substring(0, commaIdx) else dataUrl
+        val charsetIdx = header.indexOf("charset=", ignoreCase = true)
+        if (charsetIdx != -1) {
+            val start = charsetIdx + "charset=".length
+            val end = header.indexOf(';', start)
+            val endIdx = if (end != -1) end else header.length
+            return header.substring(start, endIdx).takeIf { it.isNotBlank() }
+        }
+        return null
     }
 
     fun isSimpleGetRequest(): Boolean {

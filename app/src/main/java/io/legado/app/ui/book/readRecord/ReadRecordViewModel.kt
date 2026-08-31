@@ -47,6 +47,10 @@ data class ReadRecordUiState(
     val isLoading: Boolean = true,
     val totalReadTime: Long = 0,
     val todayReadTime: Long = 0,
+    val monthReadTime: Long = 0,
+    val activeDays: Int = 0,
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
     val todayBookCount: Int = 0,
     val groupedRecords: Map<String, List<ReadRecordDetail>> = emptyMap(),
     val timelineRecords: Map<String, List<ReadRecordSession>> = emptyMap(),
@@ -267,15 +271,15 @@ class ReadRecordViewModel : ViewModel() {
             uniqueBooks.map { (bookName, bookAuthor) ->
                 async(Dispatchers.IO) {
                     val key = cacheKey(bookName, bookAuthor)
-                    // 章节标题：缓存未命中才预取
+                    // 章节标题：缓存未命中才预取（ConcurrentHashMap 不允许 null value）
                     if (!chapterTitleCache.containsKey(key)) {
                         val title = bookRepository.getBookDurChapterTitle(bookName, bookAuthor)
-                        chapterTitleCache[key] = title
+                        title?.let { chapterTitleCache[key] = it }
                     }
                     // 封面路径：缓存未命中才预取（可能触发联网搜封面）
                     if (!coverPathCache.containsKey(key)) {
                         val cover = bookRepository.getBookCoverByNameAndAuthor(bookName, bookAuthor)
-                        coverPathCache[key] = cover
+                        cover?.let { coverPathCache[key] = it }
                     }
                 }
             }.awaitAll()
@@ -326,10 +330,29 @@ class ReadRecordViewModel : ViewModel() {
             LocalDate.parse(it.date, DateTimeFormatter.ISO_LOCAL_DATE) to it.totalReadTime
         }
 
+        // 活跃日 = 有阅读记录的天数
+        val activeDays = dailyReadCounts.size
+
+        // 本月阅读时长 = 当月各天阅读时长之和
+        val currentMonth = LocalDate.now().withDayOfMonth(1)
+        val monthReadTime = dailyReadTimes.entries
+            .filter { it.key >= currentMonth }
+            .sumOf { it.value }
+
+        // 连续阅读天数：从有阅读记录的日期集合中计算
+        val sortedActiveDates = dailyReadCounts.keys.sorted()
+        val activeDateSet = dailyReadCounts.keys
+        val currentStreak = calcCurrentStreak(activeDateSet)
+        val longestStreak = calcLongestStreak(sortedActiveDates)
+
         ReadRecordUiState(
             isLoading = false,
             totalReadTime = stats.totalReadTime,
             todayReadTime = stats.todayReadTime,
+            monthReadTime = monthReadTime,
+            activeDays = activeDays,
+            currentStreak = currentStreak,
+            longestStreak = longestStreak,
             todayBookCount = stats.todayBookCount,
             groupedRecords = groupedRecords,
             timelineRecords = extra.timelineRecords,
@@ -597,4 +620,45 @@ class ReadRecordViewModel : ViewModel() {
 
 private fun recordIdentity(deviceId: String, bookName: String, bookAuthor: String): RecordIdentity {
     return Triple(deviceId, bookName, bookAuthor)
+}
+
+/**
+ * 当前连续阅读天数：从今天（或昨天）开始往前数，连续有阅读记录的最大天数。
+ * 参数为 Set 以保证 `in` 操作 O(1) 查找。
+ */
+private fun calcCurrentStreak(activeDates: Set<LocalDate>): Int {
+    if (activeDates.isEmpty()) return 0
+    val today = LocalDate.now()
+    val yesterday = today.minusDays(1)
+    // 今天有记录则从今天开始；今天没有但昨天有则从昨天开始
+    val start = when {
+        today in activeDates -> today
+        yesterday in activeDates -> yesterday
+        else -> return 0
+    }
+    var streak = 0
+    var cursor = start
+    while (cursor in activeDates) {
+        streak++
+        cursor = cursor.minusDays(1)
+    }
+    return streak
+}
+
+/**
+ * 历史最长连续阅读天数：遍历所有活跃日期，找出最长连续区间。
+ */
+private fun calcLongestStreak(activeDates: List<LocalDate>): Int {
+    if (activeDates.isEmpty()) return 0
+    var longest = 1
+    var current = 1
+    for (i in 1 until activeDates.size) {
+        if (activeDates[i] == activeDates[i - 1].plusDays(1)) {
+            current++
+            if (current > longest) longest = current
+        } else {
+            current = 1
+        }
+    }
+    return longest
 }

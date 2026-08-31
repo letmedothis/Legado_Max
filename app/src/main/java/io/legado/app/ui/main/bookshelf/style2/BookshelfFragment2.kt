@@ -15,12 +15,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.FragmentBookshelf2Binding
+import io.legado.app.help.book.BookTagHelper
+import io.legado.app.help.book.BookTagManagement
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
@@ -28,6 +31,7 @@ import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
+import io.legado.app.ui.widget.RoundedTagBarView
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
 import io.legado.app.utils.observeEvent
@@ -44,6 +48,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /**
@@ -73,6 +78,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     override var onlyUpdateRead = false
     private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
     private var itemCount = 0
+    private var tagFilter: String? = null
+    private var tagBar: RoundedTagBarView? = null
+    private var tagSelectedIndex = -1
+    private var currentTagList: List<String> = emptyList()
 
     // 计算最小公倍数
     private fun lcm(a: Int, b: Int): Int {
@@ -94,6 +103,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        tagBar = binding.tagBar
+        tagBar?.setOnTagClickListener { index ->
+            tagSelectedIndex = index
+            tagBar?.setSelectedIndex(index)
+            applyTagFilter()
+        }
         initRecyclerView()
         initBookGroupData()
         initBooksData()
@@ -241,6 +256,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     private fun initBooksData() {
         if (groupId == BookGroup.IdRoot) {
+            tagBar?.visibility = View.GONE
+            tagFilter = null
             if (isAdded) {
                 binding.titleBar.title = getString(R.string.bookshelf)
                 binding.refreshLayout.isEnabled = true
@@ -255,7 +272,17 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 enableRefresh = it.enableRefresh
                 onlyUpdateRead = it.onlyUpdateRead
             }
+            // 加载标签栏（标签栏完成后会自行刷新数据流，不会回调 initBooksData）
+            loadTagBar()
         }
+        restartBooksFlow()
+    }
+
+    /**
+     * 启动/重启书籍数据流。
+     * 根据当前 [groupId] 和 [tagFilter] 从数据库加载书籍并筛选。
+     */
+    private fun restartBooksFlow() {
         booksFlowJob?.cancel()
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
             // 方案A：使用轻量查询 flowShelfByGroup 替代 flowByGroup，
@@ -289,7 +316,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 AppLog.put("书架更新出错", it)
             }.conflate().flowOn(Dispatchers.Default).collect { list ->
                 // 方案A：将 BookShelfDisplay 转换为最小化 Book，供 style2 的 Any 类型 Adapter 使用
-                books = list.map { it.toMinimalBook() }
+                val filtered = if (tagFilter == null) list else list.filter {
+                    BookTagHelper.has(it.customTag, tagFilter!!)
+                }
+                books = filtered.map { it.toMinimalBook() }
                 booksAdapter.updateItems(groupId)
                 itemCount = getItemCount()
                 binding.tvEmptyMsg.isGone = itemCount > 0
@@ -301,6 +331,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     fun back(): Boolean {
         if (groupId != BookGroup.IdRoot) {
             groupId = BookGroup.IdRoot
+            tagBar?.visibility = View.GONE
+            tagFilter = null
             // 检查View是否存在，避免崩溃
             if (view != null && viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 initBooksData()
@@ -336,6 +368,111 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 initBooksData()
             }
         }
+    }
+
+    /**
+     * 加载当前分组的二级标签栏数据。
+     *
+     * 标签栏关闭时清除筛选状态并刷新数据流；
+     * 标签栏开启时异步加载标签，完成后设置默认筛选（全部）并刷新数据流。
+     * 标签来源：当前分组中实际有书籍使用的标签 + 用户手动配置的标签，
+     * 减去被隐藏的标签。只显示当前分组中有对应书籍的标签。
+     * 本方法不会回调 [initBooksData]，避免循环调用。
+     */
+    private fun loadTagBar() {
+        if (!AppConfig.showBookshelfTagBar) {
+            tagBar?.visibility = View.GONE
+            tagSelectedIndex = -1
+            currentTagList = emptyList()
+            tagFilter = null
+            // 不在此处 restartBooksFlow，由调用方 initBooksData 负责
+            return
+        }
+        val currentGroupId = groupId
+        viewLifecycleOwner.lifecycleScope.launch {
+            val allText = getString(R.string.bookshelf_tag_all)
+            val tags = withContext(Dispatchers.IO) {
+                val configured = AppConfig.bookshelfGroupTags[currentGroupId].orEmpty()
+                val hidden = AppConfig.bookshelfHiddenTags[currentGroupId].orEmpty()
+                val allBooks = appDb.bookDao.allTagInfos
+                val groupBooks = filterBooksByGroup(allBooks, currentGroupId)
+                val existing = groupBooks.flatMap { BookTagHelper.parse(it.customTag) }
+                val merged = BookTagManagement.mergeTags(configured, existing)
+                merged.filter { tag -> hidden.none { it.equals(tag, ignoreCase = true) } }
+            }
+            // 在标签列表前插入空字符串作为“全部”标签
+            currentTagList = listOf("") + tags
+            tagSelectedIndex = 0
+            tagBar?.visibility = View.VISIBLE
+            tagBar?.applyTopBarStyle(force = true)
+            tagBar?.submitItems(
+                currentTagList.map { RoundedTagBarView.Item(it.ifBlank { allText }) },
+                0
+            )
+            tagBar?.setSelectedIndex(0, false)
+            // 标签栏加载完成后，默认选"全部"（tagFilter=null）。
+            // 仅在 tagFilter 有非空旧值时才需重启数据流，避免不必要的取消/重启导致列表闪烁。
+            if (tagFilter != null) {
+                tagFilter = null
+                restartBooksFlow()
+            }
+        }
+    }
+
+    /**
+     * 根据 groupId 过滤书籍，逻辑与 [io.legado.app.ui.main.bookshelf.BookshelfTagManageViewModel.booksInGroup] 一致。
+     * 默认分组（负数 ID）基于 [BookType] 筛选，用户分组（正数 ID）基于 group 位掩码筛选。
+     */
+    private fun filterBooksByGroup(
+        books: List<io.legado.app.data.dao.BookTagInfo>,
+        currentGroupId: Long
+    ): List<io.legado.app.data.dao.BookTagInfo> {
+        return when (currentGroupId) {
+            BookGroup.IdAll -> books
+            BookGroup.IdLocal -> books.filter { it.type and BookType.local > 0 }
+            BookGroup.IdAudio -> books.filter { it.type and BookType.audio > 0 }
+            BookGroup.IdVideo -> books.filter { it.type and BookType.video > 0 }
+            BookGroup.IdError -> books.filter { it.type and BookType.updateError > 0 }
+            else -> {
+                val userGroupMask = appDb.bookGroupDao.all
+                    .filter { it.groupId > 0 }
+                    .fold(0L) { acc, group -> acc or group.groupId }
+                when (currentGroupId) {
+                    BookGroup.IdNetNone -> books.filter {
+                        it.type and BookType.audio == 0 &&
+                            it.type and BookType.video == 0 &&
+                            it.type and BookType.local == 0 &&
+                            (it.group and userGroupMask) == 0L
+                    }
+                    BookGroup.IdLocalNone -> books.filter {
+                        it.type and BookType.audio == 0 &&
+                            it.type and BookType.video == 0 &&
+                            it.type and BookType.local > 0 &&
+                            (it.group and userGroupMask) == 0L
+                    }
+                    else -> if (currentGroupId > 0) {
+                        books.filter { it.group and currentGroupId > 0 }
+                    } else {
+                        emptyList()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 应用当前选中的标签筛选，重新加载数据流。
+     * “全部”标签（索引0）传 null 表示不筛选。
+     */
+    private fun applyTagFilter() {
+        val selectedIndex = tagSelectedIndex
+        tagFilter = if (selectedIndex <= 0 || selectedIndex >= currentTagList.size) {
+            null
+        } else {
+            currentTagList[selectedIndex]
+        }
+        // 只重启数据流，不调用 initBooksData，避免 loadTagBar → initBooksData → loadTagBar 循环
+        restartBooksFlow()
     }
 
     override fun onItemLongClick(item: Any) {
@@ -388,6 +525,19 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             initRecyclerView()
             booksAdapter.notifyDataSetChanged()
             upFastScrollerBar()
+            // 刷新标签栏（开关状态可能变化）
+            if (groupId != BookGroup.IdRoot) {
+                loadTagBar()
+                // 标签栏从开变关时 loadTagBar 清除了 tagFilter，
+                // 需要重启数据流以应用无筛选状态
+                restartBooksFlow()
+            }
+        }
+        // 顶栏配置变更时，同步刷新二级标签栏样式
+        observeEvent<Boolean>(EventBus.TOP_BAR_CHANGED) { isNightMode ->
+            if (isNightMode == AppConfig.isNightTheme) {
+                tagBar?.applyTopBarStyle(force = true)
+            }
         }
     }
 }
