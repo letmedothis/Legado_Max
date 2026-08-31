@@ -7,6 +7,7 @@ import androidx.annotation.Keep
 import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
 import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.model.localBook.EpubFootnoteLink
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
@@ -77,7 +78,7 @@ data class TextHtmlColumn(
         if (linkUrl != null) {
             textPaint.run {
                 color = ReadBookConfig.textAccentColor
-                isUnderlineText = true
+                isUnderlineText = !EpubFootnoteLink.isFootnote(linkUrl)
                 textSkewX = if (underlineMode == 7) -0.25f else 0f
             }
             drawText(view, canvas, y, textPaint)

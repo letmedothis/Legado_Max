@@ -6,11 +6,14 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.widget.TextView
 import io.legado.app.R
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadBook
+import io.legado.app.model.localBook.EpubFootnoteLink
 import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -343,8 +346,27 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
                 is TextHtmlColumn -> {
                     column.linkUrl?.let {
-                        activity?.startActivity<OpenUrlConfirmActivity> {
-                            putExtra("uri", it)
+                        val footnote = EpubFootnoteLink.decode(it)
+                        if (footnote != null) {
+                            activity?.let { host ->
+                                val title = if (footnote.label.isBlank()) {
+                                    context.getString(R.string.epub_footnote)
+                                } else {
+                                    context.getString(
+                                        R.string.epub_footnote_with_label,
+                                        footnote.label
+                                    )
+                                }
+                                host.alert(title, footnote.content) {
+                                    okButton()
+                                }.findViewById<TextView>(android.R.id.message)?.apply {
+                                    setTextIsSelectable(true)
+                                }
+                            }
+                        } else {
+                            activity?.startActivity<OpenUrlConfirmActivity> {
+                                putExtra("uri", it)
+                            }
                         }
                         handled = true
                     }

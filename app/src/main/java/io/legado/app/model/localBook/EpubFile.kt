@@ -201,7 +201,7 @@ class EpubFile(var book: Book) {
             }
         }
         val html = elements.outerHtml()
-        return HtmlFormatter.formatKeepImg(html)
+        return EpubFootnoteProcessor.formatProcessedHtml(html)
     }
 
     private fun getBody(res: Resource, startFragmentId: String?, endFragmentId: String?): Element {
@@ -270,6 +270,11 @@ class EpubFile(var book: Book) {
             val href = res.href.encodeURI()
             val resolvedHref = URLDecoder.decode(URI(href).resolve(src).toString(), "UTF-8")
             it.attr("src", resolvedHref)
+        }
+        EpubFootnoteProcessor.process(bodyElement, res.href) { targetHref ->
+            epubBook?.resources?.getByHref(targetHref)?.let { targetResource ->
+                Jsoup.parse(String(targetResource.data, mCharset)).body()
+            }
         }
         return bodyElement
     }

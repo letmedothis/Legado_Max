@@ -26,6 +26,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ParagraphBubbleRenderer
 import io.legado.app.model.ReadBook
+import io.legado.app.model.localBook.EpubFootnoteLink
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
@@ -257,15 +258,15 @@ class TextChapterLayout(
         
         for ((contentIndex, content) in processedContents.withIndex()) {
             currentCoroutineContext().ensureActive()
-            if (adaptSpecialStyle) {
-                val text = content.trim()
-                if (text == "[newpage]") {
+            val specialText = content.trim()
+            if (adaptSpecialStyle || EpubFootnoteLink.containsFootnote(specialText)) {
+                if (adaptSpecialStyle && specialText == "[newpage]") {
                     prepareNextPageIfNeed()
                     continue
-                } else if (text.startsWith("<usehtml>")) {
-                    val endInt = text.lastIndexOf("<")
+                } else if (specialText.startsWith("<usehtml>")) {
+                    val endInt = specialText.lastIndexOf("<")
                     if (endInt > 9) {
-                        setTypeHtml(imageStyle, book, text.substring(9, endInt))
+                        setTypeHtml(imageStyle, book, specialText.substring(9, endInt))
                         continue
                     }
                 }
@@ -644,15 +645,15 @@ class TextChapterLayout(
         var wordCount = 0
         contents.forEachIndexed { contentIndex, content ->
             currentCoroutineContext().ensureActive()
-            if (adaptSpecialStyle) {
-                val text = content.trim()
-                if (text == "[newpage]") {
+            val specialText = content.trim()
+            if (adaptSpecialStyle || EpubFootnoteLink.containsFootnote(specialText)) {
+                if (adaptSpecialStyle && specialText == "[newpage]") {
                     prepareNextPageIfNeed()
                     return@forEachIndexed
-                } else if (text.startsWith("<usehtml>")) {
-                    val endInt = text.lastIndexOf("<")
+                } else if (specialText.startsWith("<usehtml>")) {
+                    val endInt = specialText.lastIndexOf("<")
                     if (endInt > 9) {
-                        setTypeHtml(imageStyle, book, text.substring(9, endInt))
+                        setTypeHtml(imageStyle, book, specialText.substring(9, endInt))
                         return@forEachIndexed
                     }
                 }

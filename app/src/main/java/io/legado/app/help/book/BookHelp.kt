@@ -14,6 +14,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.localBook.EpubContentCache
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.FileUtils
@@ -195,12 +196,17 @@ object BookHelp {
     ) {
         if (content.isEmpty()) return
         //保存文本
+        val storedContent = if (book.isEpub) {
+            EpubContentCache.encode(content)
+        } else {
+            content
+        }
         FileUtils.createFileIfNotExist(
             downloadDir,
             cacheFolderName,
             book.getFolderName(),
             bookChapter.getFileName(),
-        ).writeText(content)
+        ).writeText(storedContent)
         if (book.isOnLineTxt && AppConfig.tocCountWords) {
             val wordCount = StringUtils.wordCountFormat(content.length)
             bookChapter.wordCount = wordCount
@@ -392,11 +398,14 @@ object BookHelp {
         ) {
             true
         } else {
-            downloadDir.exists(
+            val file = downloadDir.getFile(
                 cacheFolderName,
                 book.getFolderName(),
                 bookChapter.getFileName()
             )
+            file.exists() && (!book.isEpub || runCatching {
+                file.bufferedReader().use { it.readLine() } == EpubContentCache.VERSION_LINE
+            }.getOrDefault(false))
         }
     }
 
@@ -452,11 +461,14 @@ object BookHelp {
             bookChapter.getFileName()
         )
         if (file.exists()) {
-            val string = file.readText()
-            if (string.isEmpty()) {
-                return null
+            val storedContent = file.readText()
+            val content = if (book.isEpub) {
+                EpubContentCache.decode(storedContent)
+            } else {
+                storedContent
             }
-            return string
+            if (!content.isNullOrEmpty()) return content
+            if (!book.isEpub) return null
         }
         if (book.isLocal) {
             val string = LocalBook.getContent(book, bookChapter)
