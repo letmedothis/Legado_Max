@@ -242,6 +242,20 @@ jobs:
             --notes-file release-notes.md \
             --prerelease \
             --latest=false
-          gh release upload "$RELEASE_TAG" all_apks/*.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
+          for apk in all_apks/*.apk; do
+            uploaded=false
+            for attempt in 1 2 3 4 5; do
+              echo "上传 $(basename "$apk")（第 ${attempt}/5 次）"
+              if gh release upload "$RELEASE_TAG" "$apk" \
+                --repo "$GITHUB_REPOSITORY" \
+                --clobber; then
+                uploaded=true
+                break
+              fi
+              sleep 8
+            done
+            if [[ "$uploaded" != true ]]; then
+              echo "上传失败：$(basename "$apk")"
+              exit 1
+            fi
+          done
