@@ -57,8 +57,8 @@ interface ReadRecordDao {
     @Query("DELETE FROM readRecord WHERE bookName = :bookName AND bookAuthor = :bookAuthor")
     suspend fun deleteByNameAndAuthor(bookName: String, bookAuthor: String)
 
-    @Query("SELECT * FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
-    suspend fun getReadRecord(deviceId: String, bookName: String, bookAuthor: String): ReadRecord?
+    @Query("SELECT * FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND source = :source")
+    suspend fun getReadRecord(deviceId: String, bookName: String, bookAuthor: String, source: String = "TEXT"): ReadRecord?
 
     @Query("SELECT * FROM readRecord")
     suspend fun getAllReadRecordsList(): List<ReadRecord>
@@ -85,17 +85,18 @@ interface ReadRecordDao {
             "ELSE readRecord.readTime END), 0) " +
             "FROM readRecord " +
             "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, SUM(readTime) AS total_detail_time " +
-            "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor) detail_sums " +
+            "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor, source) detail_sums " +
             "ON readRecord.deviceId = detail_sums.deviceId " +
             "AND readRecord.bookName = detail_sums.bookName " +
-            "AND readRecord.bookAuthor = detail_sums.bookAuthor"
+            "AND readRecord.bookAuthor = detail_sums.bookAuthor " +
+            "AND readRecord.source = detail_sums.source"
     )
     fun getCalculatedTotalReadTime(): Flow<Long>
 
-    @Query("SELECT readTime FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
+    @Query("SELECT COALESCE(SUM(readTime), 0) FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
     fun getReadTimeFlow(deviceId: String, bookName: String, bookAuthor: String): Flow<Long?>
 
-    @Query("SELECT readTime FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
+    @Query("SELECT COALESCE(SUM(readTime), 0) FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
     suspend fun getReadTime(deviceId: String, bookName: String, bookAuthor: String): Long?
 
     @Query("SELECT * FROM readRecord ORDER BY lastRead DESC")
@@ -110,8 +111,8 @@ interface ReadRecordDao {
     @Query("SELECT * FROM readRecord WHERE bookName LIKE '%' || :query || '%' OR bookAuthor LIKE '%' || :query || '%' ORDER BY lastRead DESC")
     fun searchReadRecordsByLastRead(query: String): Flow<List<ReadRecord>>
 
-    @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date = :date")
-    suspend fun getDetail(deviceId: String, bookName: String, bookAuthor: String, date: String): ReadRecordDetail?
+    @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date = :date AND source = :source")
+    suspend fun getDetail(deviceId: String, bookName: String, bookAuthor: String, date: String, source: String = "TEXT"): ReadRecordDetail?
 
     @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
     suspend fun getDetailsByBook(deviceId: String, bookName: String, bookAuthor: String): List<ReadRecordDetail>
@@ -277,11 +278,11 @@ interface ReadRecordDao {
     @Query(
         "SELECT r.deviceId, r.bookName, r.bookAuthor, " +
             "MAX(r.readTime, COALESCE(d.totalReadTime, 0)) as readTime, " +
-            "r.lastRead, r.durChapterTitle, r.durChapterIndex " +
+            "r.lastRead, r.durChapterTitle, r.durChapterIndex, r.source " +
             "FROM readRecord r " +
             "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, SUM(readTime) AS totalReadTime " +
-            "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor) d " +
-            "ON r.deviceId = d.deviceId AND r.bookName = d.bookName AND r.bookAuthor = d.bookAuthor " +
+            "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor, source) d " +
+            "ON r.deviceId = d.deviceId AND r.bookName = d.bookName AND r.bookAuthor = d.bookAuthor AND r.source = d.source " +
             "WHERE (:query = '' OR r.bookName LIKE '%' || :query || '%' OR r.bookAuthor LIKE '%' || :query || '%') " +
             "ORDER BY r.lastRead DESC"
     )
@@ -295,12 +296,12 @@ interface ReadRecordDao {
         "SELECT d.deviceId, d.bookName, d.bookAuthor, " +
             "SUM(d.readTime) as readTime, MAX(d.lastReadTime) as lastRead, " +
             "COALESCE(MAX(r.durChapterTitle), '') as durChapterTitle, " +
-            "COALESCE(MAX(r.durChapterIndex), 0) as durChapterIndex " +
+            "COALESCE(MAX(r.durChapterIndex), 0) as durChapterIndex, d.source " +
             "FROM readRecordDetail d " +
-            "LEFT JOIN readRecord r ON d.deviceId = r.deviceId AND d.bookName = r.bookName AND d.bookAuthor = r.bookAuthor " +
+            "LEFT JOIN readRecord r ON d.deviceId = r.deviceId AND d.bookName = r.bookName AND d.bookAuthor = r.bookAuthor AND d.source = r.source " +
             "WHERE d.date = :date " +
             "AND (:query = '' OR d.bookName LIKE '%' || :query || '%' OR d.bookAuthor LIKE '%' || :query || '%') " +
-            "GROUP BY d.deviceId, d.bookName, d.bookAuthor " +
+            "GROUP BY d.deviceId, d.bookName, d.bookAuthor, d.source " +
             "ORDER BY MAX(d.lastReadTime) DESC"
     )
     fun getRecordsByDate(query: String, date: String): Flow<List<ReadRecord>>
@@ -310,10 +311,11 @@ interface ReadRecordDao {
      * 返回 MAX(readRecord.readTime, detail 之和)。
      */
     @Query(
-        "SELECT COALESCE(MAX(" +
-            "COALESCE((SELECT readTime FROM readRecord WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor), 0), " +
-            "COALESCE((SELECT SUM(readTime) FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor), 0)" +
-            "), 0)"
+        "SELECT COALESCE(SUM(MAX(r.readTime, COALESCE(d.totalReadTime, 0))), 0) " +
+            "FROM readRecord r LEFT JOIN (SELECT deviceId, bookName, bookAuthor, source, SUM(readTime) AS totalReadTime " +
+            "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor, source) d " +
+            "ON r.deviceId = d.deviceId AND r.bookName = d.bookName AND r.bookAuthor = d.bookAuthor AND r.source = d.source " +
+            "WHERE r.deviceId = :deviceId AND r.bookName = :bookName AND r.bookAuthor = :bookAuthor"
     )
     fun getBookReadTimeCalculated(deviceId: String, bookName: String, bookAuthor: String): Flow<Long>
 

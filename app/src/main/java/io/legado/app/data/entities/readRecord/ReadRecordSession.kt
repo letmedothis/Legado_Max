@@ -19,5 +19,7 @@ data class ReadRecordSession(
 
     val words: Long = 0,
     @ColumnInfo(defaultValue = "")
-    val durChapterTitle: String = ""
+    val durChapterTitle: String = "",
+    @ColumnInfo(defaultValue = "TEXT")
+    val source: String = ReadRecordSource.TEXT.name
 )

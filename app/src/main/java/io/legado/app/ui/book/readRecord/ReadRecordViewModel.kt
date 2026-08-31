@@ -94,7 +94,8 @@ private data class StatsData(
 /** 搜索 + 日期筛选状态。 */
 private data class FilterState(
     val query: String,
-    val dateStr: String?
+    val dateStr: String?,
+    val source: String?
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -116,6 +117,8 @@ class ReadRecordViewModel : ViewModel() {
     val enableReadRecord = _enableReadRecord.asStateFlow()
     private val _searchKey = MutableStateFlow("")
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    private val _sourceFilter = MutableStateFlow<String?>(null)
+    val sourceFilter = _sourceFilter.asStateFlow()
     private val _isSelectionMode = MutableStateFlow(false)
     private val _selectedRecords = MutableStateFlow<Set<RecordIdentity>>(emptySet())
 
@@ -141,8 +144,8 @@ class ReadRecordViewModel : ViewModel() {
     // ==================== 拆分后的 Flow ====================
 
     /** 搜索 + 日期筛选状态（派生自 _searchKey 和 _selectedDate） */
-    private val filterState = combine(_searchKey, _selectedDate) { query, date ->
-        FilterState(query, date?.format(DateTimeFormatter.ISO_LOCAL_DATE))
+    private val filterState = combine(_searchKey, _selectedDate, _sourceFilter) { query, date, source ->
+        FilterState(query, date?.format(DateTimeFormatter.ISO_LOCAL_DATE), source)
     }
 
     /**
@@ -166,7 +169,7 @@ class ReadRecordViewModel : ViewModel() {
         } else {
             repository.getRecordsByDate(filter.query, filter.dateStr)
         }
-    }
+    }.map { records -> records.filter { _sourceFilter.value == null || it.source == _sourceFilter.value } }
 
     /**
      * 按显示模式加载的额外数据 Flow。
@@ -177,7 +180,7 @@ class ReadRecordViewModel : ViewModel() {
             when (mode) {
                 DisplayMode.AGGREGATE -> filterState.flatMapLatest { filter ->
                     repository.getFilteredDetails(filter.query, filter.dateStr)
-                        .map { ModeData(details = it) }
+                        .map { details -> ModeData(details = details.filter { filter.source == null || it.source == filter.source }) }
                 }
                 DisplayMode.TIMELINE, DisplayMode.LATEST, DisplayMode.READ_TIME -> flowOf(ModeData())
             }
@@ -213,24 +216,25 @@ class ReadRecordViewModel : ViewModel() {
                     if (mode == DisplayMode.TIMELINE) {
                         timelineReloadJob?.cancel()
                         timelineReloadJob = launch(Dispatchers.IO) {
-                            loadTimelineFirstPage(filter.query, filter.dateStr)
+                        loadTimelineFirstPage(filter.query, filter.dateStr, filter.source)
                         }
                     }
                 }
         }
     }
 
-    private suspend fun loadTimelineFirstPage(query: String, dateFilter: String?) {
+    private suspend fun loadTimelineFirstPage(query: String, dateFilter: String?, source: String?) {
         _timelineLoadingMore.value = true
         val sessions = withContext(Dispatchers.IO) {
             repository.loadSessionsPage(query, dateFilter, null, timelinePageSize)
         }
-        _timelineRawSessions.value = sessions
-        _timelineSessions.value = buildTimelineMap(sessions)
+        val filtered = sessions.filter { source == null || it.source == source }
+        _timelineRawSessions.value = filtered
+        _timelineSessions.value = buildTimelineMap(filtered)
         _timelineHasMore.value = sessions.size >= timelinePageSize
         _timelineLoadingMore.value = false
         // 批量预取章节标题和封面路径
-        prefetchMetadata(sessions)
+        prefetchMetadata(filtered)
     }
 
     fun loadMoreTimelineSessions() {
@@ -241,6 +245,7 @@ class ReadRecordViewModel : ViewModel() {
         val lastSession = currentRaw.last()
         val query = _searchKey.value
         val dateStr = _selectedDate.value?.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val source = _sourceFilter.value
         viewModelScope.launch(Dispatchers.IO) {
             _timelineLoadingMore.value = true
             val moreSessions = repository.loadSessionsPage(
@@ -251,13 +256,14 @@ class ReadRecordViewModel : ViewModel() {
                 _timelineLoadingMore.value = false
                 return@launch
             }
-            val combinedRaw = currentRaw + moreSessions
+            val filteredMore = moreSessions.filter { source == null || it.source == source }
+            val combinedRaw = currentRaw + filteredMore
             _timelineRawSessions.value = combinedRaw
             _timelineSessions.value = buildTimelineMap(combinedRaw)
             _timelineHasMore.value = moreSessions.size >= timelinePageSize
             _timelineLoadingMore.value = false
             // 批量预取新增 sessions 的元数据
-            prefetchMetadata(moreSessions)
+            prefetchMetadata(filteredMore)
         }
     }
 
@@ -347,7 +353,7 @@ class ReadRecordViewModel : ViewModel() {
 
         ReadRecordUiState(
             isLoading = false,
-            totalReadTime = stats.totalReadTime,
+            totalReadTime = if (filter.source == null) stats.totalReadTime else records.sumOf { it.readTime },
             todayReadTime = stats.todayReadTime,
             monthReadTime = monthReadTime,
             activeDays = activeDays,
@@ -400,6 +406,10 @@ class ReadRecordViewModel : ViewModel() {
 
     fun setSelectedDate(date: LocalDate?) {
         _selectedDate.value = date
+    }
+
+    fun setSourceFilter(source: String?) {
+        _sourceFilter.value = source
     }
 
     fun deleteDetail(detail: ReadRecordDetail) {

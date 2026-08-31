@@ -3,7 +3,7 @@ package io.legado.app.data.entities.readRecord
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 
-@Entity(tableName = "readRecord", primaryKeys = ["deviceId", "bookName", "bookAuthor"])
+@Entity(tableName = "readRecord", primaryKeys = ["deviceId", "bookName", "bookAuthor", "source"])
 data class ReadRecord(
     var deviceId: String = "",
     var bookName: String = "",
@@ -16,5 +16,7 @@ data class ReadRecord(
     @ColumnInfo(defaultValue = "")
     var durChapterTitle: String = "",
     @ColumnInfo(defaultValue = "0")
-    var durChapterIndex: Int = 0
+    var durChapterIndex: Int = 0,
+    @ColumnInfo(defaultValue = "TEXT")
+    var source: String = ReadRecordSource.TEXT.name
 )

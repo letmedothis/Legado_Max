@@ -65,6 +65,7 @@ fun ReadRecordScreen(
 
     val state by viewModel.uiState.collectAsState()
     val displayMode by viewModel.displayMode.collectAsState()
+    val sourceFilter by viewModel.sourceFilter.collectAsState()
     val enableReadRecord by viewModel.enableReadRecord.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
@@ -300,6 +301,16 @@ fun ReadRecordScreen(
                                 expanded = showOverflowMenu,
                                 onDismissRequest = { showOverflowMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("来源：${sourceFilter?.let(::readRecordSourceLabel) ?: "全部"}") },
+                                    onClick = { viewModel.setSourceFilter(null); showOverflowMenu = false }
+                                )
+                                listOf("TEXT", "MANGA", "AUDIO", "VIDEO").forEach { source ->
+                                    DropdownMenuItem(
+                                        text = { Text(readRecordSourceLabel(source)) },
+                                        onClick = { viewModel.setSourceFilter(source); showOverflowMenu = false }
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = {
                                         Text(if (enableReadRecord) stringResource(R.string.rr_close_record) else stringResource(R.string.rr_open_record))
@@ -1238,6 +1249,11 @@ private fun LatestRecordItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = secondaryTextColor
                 )
+                Text(
+                    text = readRecordSourceLabel(record.source),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 chapterTitle?.let {
                     Text(
                         text = it,
@@ -1303,6 +1319,13 @@ private fun LatestRecordItem(
             }
         }
     }
+}
+
+private fun readRecordSourceLabel(source: String): String = when (source) {
+    "MANGA" -> "漫画阅读"
+    "AUDIO" -> "听书"
+    "VIDEO" -> "视频"
+    else -> "文本阅读"
 }
 
 @OptIn(ExperimentalFoundationApi::class)

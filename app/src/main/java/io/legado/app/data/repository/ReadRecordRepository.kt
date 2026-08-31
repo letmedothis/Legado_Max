@@ -6,6 +6,7 @@ import io.legado.app.data.dao.ReadRecordDao
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.entities.readRecord.ReadRecordSource
 import io.legado.app.data.entities.readRecord.ReadRecordTimelineDay
 import io.legado.app.constant.AppConst
 import kotlinx.coroutines.Dispatchers
@@ -45,24 +46,31 @@ class ReadRecordRepository(
 
     private fun normalizeBookAuthor(bookAuthor: String): String = bookAuthor.trim()
 
+    private fun normalizeSource(source: String?): String = runCatching {
+        ReadRecordSource.valueOf(source ?: ReadRecordSource.TEXT.name).name
+    }.getOrDefault(ReadRecordSource.TEXT.name)
+
     private fun normalizeRecord(record: ReadRecord): ReadRecord {
         return record.copy(
             bookName = normalizeBookName(record.bookName),
-            bookAuthor = normalizeBookAuthor(record.bookAuthor)
+            bookAuthor = normalizeBookAuthor(record.bookAuthor),
+            source = normalizeSource(record.source)
         )
     }
 
     private fun normalizeDetail(detail: ReadRecordDetail): ReadRecordDetail {
         return detail.copy(
             bookName = normalizeBookName(detail.bookName),
-            bookAuthor = normalizeBookAuthor(detail.bookAuthor)
+            bookAuthor = normalizeBookAuthor(detail.bookAuthor),
+            source = normalizeSource(detail.source)
         )
     }
 
     private fun normalizeSession(session: ReadRecordSession): ReadRecordSession {
         return session.copy(
             bookName = normalizeBookName(session.bookName),
-            bookAuthor = normalizeBookAuthor(session.bookAuthor)
+            bookAuthor = normalizeBookAuthor(session.bookAuthor),
+            source = normalizeSource(session.source)
         )
     }
 
@@ -312,12 +320,13 @@ class ReadRecordRepository(
 
     private suspend fun updateReadRecord(session: ReadRecordSession, durationDelta: Long) {
         if (durationDelta <= 0) return
-        val existingRecord = dao.getReadRecord(session.deviceId, session.bookName, session.bookAuthor)
+        val existingRecord = dao.getReadRecord(session.deviceId, session.bookName, session.bookAuthor, session.source)
         if (existingRecord != null) {
             dao.update(
                 existingRecord.copy(
                     readTime = existingRecord.readTime + durationDelta,
-                    lastRead = session.endTime
+                    lastRead = session.endTime,
+                    source = session.source
                 )
             )
         } else {
@@ -344,7 +353,8 @@ class ReadRecordRepository(
             session.deviceId,
             session.bookName,
             session.bookAuthor,
-            dateString
+            dateString,
+            session.source
         )
         if (existingDetail != null) {
             existingDetail.readTime += durationDelta
@@ -362,7 +372,8 @@ class ReadRecordRepository(
                     readTime = durationDelta,
                     readWords = wordsDelta,
                     firstReadTime = session.startTime,
-                    lastReadTime = session.endTime
+                    lastReadTime = session.endTime,
+                    source = session.source
                 )
             )
         }

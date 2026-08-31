@@ -10,6 +10,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.entities.readRecord.ReadRecordSource
 import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.ConcurrentRateLimiter
@@ -155,7 +156,8 @@ object ReadManga : CoroutineScope by MainScope() {
                 startTime = sessionStartTime,
                 endTime = now,
                 words = 0,
-                durChapterTitle = readRecord.durChapterTitle
+                durChapterTitle = readRecord.durChapterTitle,
+                source = ReadRecordSource.MANGA.name
             )
             
             val repository = ReadRecordRepository(appDb.readRecordDao)
@@ -177,6 +179,7 @@ object ReadManga : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord || book == null) {
             return
         }
+        readRecord.source = ReadRecordSource.MANGA.name
         val now = System.currentTimeMillis()
         sessionStartTime = now
         readStartTime = now

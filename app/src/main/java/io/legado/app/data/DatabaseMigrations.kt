@@ -21,7 +21,7 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_95_96, migration_96_97, migration_97_98, migration_98_99,
-            migration_99_100
+            migration_99_100, migration_100_101
         )
     }
 
@@ -675,6 +675,29 @@ object DatabaseMigrations {
                     // 列可能已存在（多进程并发迁移等极端场景），忽略错误继续
                     android.util.Log.e("DatabaseMigrations", "99→100: 添加 homepageModules 列失败", e)
                 }
+            }
+        }
+    }
+
+    private val migration_100_101 = object : Migration(100, 101) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.beginTransaction()
+            try {
+                db.execSQL("CREATE TABLE readRecord_new (deviceId TEXT NOT NULL, bookName TEXT NOT NULL, bookAuthor TEXT NOT NULL DEFAULT '', readTime INTEGER NOT NULL DEFAULT 0, lastRead INTEGER NOT NULL DEFAULT 0, durChapterTitle TEXT NOT NULL DEFAULT '', durChapterIndex INTEGER NOT NULL DEFAULT 0, source TEXT NOT NULL DEFAULT 'TEXT', PRIMARY KEY(deviceId, bookName, bookAuthor, source))")
+                db.execSQL("INSERT INTO readRecord_new SELECT deviceId, bookName, bookAuthor, readTime, lastRead, durChapterTitle, durChapterIndex, 'TEXT' FROM readRecord")
+                db.execSQL("DROP TABLE readRecord")
+                db.execSQL("ALTER TABLE readRecord_new RENAME TO readRecord")
+                db.execSQL("CREATE TABLE readRecordDetail_new (deviceId TEXT NOT NULL, bookName TEXT NOT NULL, bookAuthor TEXT NOT NULL DEFAULT '', date TEXT NOT NULL, readTime INTEGER NOT NULL DEFAULT 0, readWords INTEGER NOT NULL DEFAULT 0, firstReadTime INTEGER NOT NULL DEFAULT 0, lastReadTime INTEGER NOT NULL DEFAULT 0, source TEXT NOT NULL DEFAULT 'TEXT', PRIMARY KEY(deviceId, bookName, bookAuthor, date, source))")
+                db.execSQL("INSERT INTO readRecordDetail_new SELECT deviceId, bookName, bookAuthor, date, readTime, readWords, firstReadTime, lastReadTime, 'TEXT' FROM readRecordDetail")
+                db.execSQL("DROP TABLE readRecordDetail")
+                db.execSQL("ALTER TABLE readRecordDetail_new RENAME TO readRecordDetail")
+                db.execSQL("CREATE TABLE readRecordSession_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, deviceId TEXT NOT NULL, bookName TEXT NOT NULL, bookAuthor TEXT NOT NULL DEFAULT '', startTime INTEGER NOT NULL, endTime INTEGER NOT NULL, words INTEGER NOT NULL DEFAULT 0, durChapterTitle TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'TEXT')")
+                db.execSQL("INSERT INTO readRecordSession_new SELECT id, deviceId, bookName, bookAuthor, startTime, endTime, words, durChapterTitle, 'TEXT' FROM readRecordSession")
+                db.execSQL("DROP TABLE readRecordSession")
+                db.execSQL("ALTER TABLE readRecordSession_new RENAME TO readRecordSession")
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
             }
         }
     }
