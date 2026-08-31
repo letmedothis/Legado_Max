@@ -212,41 +212,49 @@ jobs:
           test -n "$(find all_apks -type f -name '*.apk' -print -quit)"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ needs.prepare.outputs.release_tag }}
-          name: 阅读Max开发版 ${{ needs.prepare.outputs.version }}
-          body: |
-            ## 版本说明
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_UPDATE_LOG: ${{ needs.prepare.outputs.update_log }}
+        shell: bash
+        run: |
+          cat > release-notes.md <<EOF
+          ## 版本说明
 
-            这是 `my-changes` 开发分支的自动构建版本，包含测试版、兼容版、共存版和调试版。
+          这是 `my-changes` 开发分支的自动构建版本，包含测试版、兼容版、共存版和调试版。
 
-            - 版本号：`${{ needs.prepare.outputs.version }}`
-            - 提交：`${{ github.sha }}`
-            - 分支：`${{ github.ref_name }}`
+          - 版本号：`${RELEASE_VERSION}`
+          - 提交：`${GITHUB_SHA}`
+          - 分支：`${GITHUB_REF_NAME}`
 
-            ## 版本类型
+          ## 版本类型
 
-            | 类型 | Gradle 变体 | 用途 |
-            |------|-------------|------|
-            | 测试版 | `appMaxRelease` | Max 主开发版本 |
-            | 共存版 | `appSRelease` | 与其他版本共存 |
-            | 兼容版 | `appLegacyRelease` | 兼容原版包名 |
-            | 调试版 | `appMaxDebug` | 无混淆，便于调试和收集日志 |
+          | 类型 | Gradle 变体 | 用途 |
+          |------|-------------|------|
+          | 测试版 | `appMaxRelease` | Max 主开发版本 |
+          | 共存版 | `appSRelease` | 与其他版本共存 |
+          | 兼容版 | `appLegacyRelease` | 兼容原版包名 |
+          | 调试版 | `appMaxDebug` | 无混淆，便于调试和收集日志 |
 
-            ## 架构说明
+          ## 架构说明
 
-            Release 版本包含 `arm64-v8a`、`armeabi-v7a` 和 `universal` 三种 APK；调试版按项目默认配置生成 `universal` 通用包。若不确定设备架构，请选择 `universal`。
+          Release 版本包含 `arm64-v8a`、`armeabi-v7a` 和 `universal` 三种 APK；调试版按项目默认配置生成 `universal` 通用包。若不确定设备架构，请选择 `universal`。
 
-            ## 更新内容（本次推送的全部提交）
+          ## 更新内容（本次推送的全部提交）
 
-            ${{ needs.prepare.outputs.update_log }}
+          ${RELEASE_UPDATE_LOG}
 
-            ## Assets
+          ## Assets
 
-            APK 文件名中的版本类型和 ABI 标识对应上面的说明。
-          prerelease: true
-          make_latest: false
-          files: all_apks/*.apk
-          fail_on_unmatched_files: true
+          APK 文件名中的版本类型和 ABI 标识对应上面的说明。
+          EOF
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "阅读Max开发版 ${RELEASE_VERSION}" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --latest=false
+          gh release upload "$RELEASE_TAG" all_apks/*.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
