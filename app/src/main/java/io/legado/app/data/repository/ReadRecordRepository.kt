@@ -150,6 +150,18 @@ class ReadRecordRepository(
         return dao.sessionsCountFlow().map { loadFilteredSessionsPaginated(query, dateFilter) }
     }
 
+    fun getAllSessions(): Flow<List<ReadRecordSession>> = dao.getAllSessions()
+
+    suspend fun getCompletionRate(records: List<ReadRecord>): Int {
+        val rates = records.mapNotNull { record ->
+            appDb.bookDao.getBook(record.bookName, record.bookAuthor)?.let { book ->
+                val total = book.totalChapterNum
+                if (total > 0) (record.durChapterIndex + 1).coerceIn(0, total) * 100 / total else null
+            }
+        }
+        return if (rates.isEmpty()) 0 else rates.average().toInt()
+    }
+
     private suspend fun loadFilteredSessionsPaginated(query: String, dateFilter: String?): List<ReadRecordSession> {
         val pageSize = 500
         val sessions = mutableListOf<ReadRecordSession>()

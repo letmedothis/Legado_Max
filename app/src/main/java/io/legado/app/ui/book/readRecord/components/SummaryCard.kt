@@ -26,12 +26,17 @@ import io.legado.app.R
 import io.legado.app.ui.book.readRecord.readRecordCardBorder
 import io.legado.app.ui.book.readRecord.readRecordSecondaryTextColor
 import io.legado.app.ui.book.readRecord.readRecordSummaryCardContainerColor
+import io.legado.app.utils.formatReadDuration
 
 @Composable
 fun SummaryCard(
     totalReadTime: Long,
     todayReadTime: Long,
     monthReadTime: Long,
+    readWords: Long,
+    readingSpeed: Long,
+    timeOfDay: Map<String, Long>,
+    completionRate: Int,
     activeDays: Int,
     currentStreak: Int,
     longestStreak: Int,
@@ -103,6 +108,41 @@ fun SummaryCard(
                     ),
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            if (readWords > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    StatItem(
+                        label = "阅读字数",
+                        value = "${readWords}字",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatItem(
+                        label = "阅读速度",
+                        value = "${readingSpeed}字/分钟",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            if (timeOfDay.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("阅读时段", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor)
+                Text(
+                    timeOfDay.entries.sortedByDescending { it.value }
+                        .joinToString(" · ") { "${it.key} ${formatReadDuration(context, it.value)}" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryTextColor
+                )
+            }
+
+            if (completionRate > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("当前书籍平均完成率：${completionRate}%", style = MaterialTheme.typography.bodySmall, color = secondaryTextColor)
             }
 
             Spacer(modifier = Modifier.height(12.dp))

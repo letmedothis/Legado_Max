@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,6 +49,13 @@ data class ReadRecordUiState(
     val totalReadTime: Long = 0,
     val todayReadTime: Long = 0,
     val monthReadTime: Long = 0,
+    val readWords: Long = 0,
+    val readingSpeed: Long = 0,
+    val timeSlotStats: Map<ReadTimeSlot, Long> = emptyMap(),
+    val completionRate: Int = 0,
+    val completedBookCount: Int = 0,
+    val timeOfDay: Map<String, Long> = emptyMap(),
+    val completionRate: Int = 0,
     val activeDays: Int = 0,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
@@ -88,7 +96,14 @@ private data class StatsData(
     val totalReadTime: Long,
     val dailyStats: List<DailyReadStat>,
     val todayReadTime: Long,
-    val todayBookCount: Int
+    val todayBookCount: Int,
+    val totalReadWords: Long,
+    val timeSlotStats: Map<ReadTimeSlot, Long>
+)
+
+private data class CompletionData(
+    val rate: Int = 0,
+    val completedCount: Int = 0
 )
 
 /** 搜索 + 日期筛选状态。 */
@@ -106,6 +121,7 @@ class ReadRecordViewModel : ViewModel() {
 
     private val coverPathCache = ConcurrentHashMap<String, String?>()
     private val chapterTitleCache = ConcurrentHashMap<String, String?>()
+    private val chapterCountCache = ConcurrentHashMap<String, Int>()
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
         timeZone = TimeZone.getDefault()
@@ -151,13 +167,71 @@ class ReadRecordViewModel : ViewModel() {
     /**
      * 轻量级统计数据 Flow —— SQL 聚合，始终加载。
      */
-    private val statsFlow = combine(
+    private val baseStatsFlow = combine(
         repository.getTotalReadTime(),
         repository.getDailyStats(),
         repository.getReadTimeByDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)),
         repository.getBookCountByDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
     ) { total, daily, todayTime, todayCount ->
-        StatsData(total, daily, todayTime, todayCount)
+        StatsData(total, daily, todayTime, todayCount, 0L, emptyMap())
+    }
+
+    /** 统计用详情流使用分页加载，避免一次性从 Room 读取超大 Cursor。 */
+    private val statsDetailsFlow = filterState.flatMapLatest { filter ->
+        repository.getFilteredDetails("", null)
+            .map { details -> details.filter { filter.source == null || it.source == filter.source } }
+    }
+
+    private val statsSessionsFlow = filterState.flatMapLatest { filter ->
+        repository.getFilteredSessions("", null)
+            .map { sessions -> sessions.filter { filter.source == null || it.source == filter.source } }
+    }
+
+    private val statsFlow = combine(
+        baseStatsFlow,
+        filterState,
+        statsDetailsFlow,
+        statsSessionsFlow
+    ) { base, filter, details, sessions ->
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val dailyStats = if (filter.source == null) {
+            base.dailyStats
+        } else {
+            details.groupBy { it.date }.map { (date, items) ->
+                DailyReadStat(date, items.size, items.sumOf { it.readTime })
+            }.sortedByDescending { it.date }
+        }
+        val totalReadTime = if (filter.source == null) base.totalReadTime else details.sumOf { it.readTime }
+        val todayReadTime = if (filter.source == null) base.todayReadTime else details.filter { it.date == today }.sumOf { it.readTime }
+        val todayBookCount = if (filter.source == null) base.todayBookCount else details.asSequence()
+            .filter { it.date == today }
+            .map { Triple(it.deviceId, it.bookName, it.bookAuthor) }
+            .distinct()
+            .count()
+        val timeSlots = sessions.groupBy {
+            val hour = Instant.ofEpochMilli(it.startTime).atZone(ZoneId.systemDefault()).hour
+            readTimeSlotForHour(hour)
+        }.mapValues { (_, items) -> items.sumOf { (it.endTime - it.startTime).coerceAtLeast(0L) } }
+        StatsData(totalReadTime, dailyStats, todayReadTime, todayBookCount, details.sumOf { it.readWords }, timeSlots)
+    }
+
+    private val completionFlow = recordsFlow.mapLatest { records ->
+        if (records.isEmpty()) return@mapLatest CompletionData()
+        val percentages = coroutineScope {
+            records.map { record ->
+                async(Dispatchers.IO) {
+                    val key = "${record.bookName}\u0000${record.bookAuthor}"
+                    val chapterCount = chapterCountCache[key] ?: bookRepository.getChapterCount(record.bookName, record.bookAuthor).also {
+                        chapterCountCache[key] = it
+                    }
+                    completionPercent(record.durChapterIndex, chapterCount)
+                }
+            }.awaitAll()
+        }
+        CompletionData(
+            rate = percentages.average().toInt(),
+            completedCount = percentages.count { it >= 100 }
+        )
     }
 
     /**
@@ -178,11 +252,11 @@ class ReadRecordViewModel : ViewModel() {
     private val modeDataFlow: StateFlow<ModeData> = _displayMode
         .flatMapLatest { mode ->
             when (mode) {
-                DisplayMode.AGGREGATE -> filterState.flatMapLatest { filter ->
+                DisplayMode.AGGREGATE, DisplayMode.LATEST, DisplayMode.READ_TIME -> filterState.flatMapLatest { filter ->
                     repository.getFilteredDetails(filter.query, filter.dateStr)
                         .map { details -> ModeData(details = details.filter { filter.source == null || it.source == filter.source }) }
                 }
-                DisplayMode.TIMELINE, DisplayMode.LATEST, DisplayMode.READ_TIME -> flowOf(ModeData())
+                DisplayMode.TIMELINE -> flowOf(ModeData())
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ModeData())
@@ -311,6 +385,9 @@ class ReadRecordViewModel : ViewModel() {
         ExtraState(sessions, hasMore, loadingMore, isSel, selRecs)
     }
 
+    private val allSessionsFlow = repository.getAllSessions()
+    private val completionRateFlow = recordsFlow.map { repository.getCompletionRate(it) }.flowOn(Dispatchers.IO)
+
     /**
      * UI 状态 Flow —— 组合统计数据、记录、模式数据、筛选状态和额外状态（timeline 分页 + 选择模式）。
      */
@@ -319,14 +396,32 @@ class ReadRecordViewModel : ViewModel() {
         recordsFlow,
         modeDataFlow,
         filterState,
-        extraState
-    ) { stats, records, modeData, filter, extra ->
+        extraState,
+        allSessionsFlow,
+        completionRateFlow
+    ) { stats, records, modeData, filter, extra, allSessions, completionRate ->
         val selectedDate = filter.dateStr?.let { LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE) }
 
         // AGGREGATE 模式：details 按 date 分组
         val groupedRecords = modeData.details
             ?.groupBy { it.date }
             ?: emptyMap()
+        val readWords = modeData.details?.sumOf { it.readWords } ?: 0L
+        val effectiveTime = if (filter.source == null) stats.totalReadTime else records.sumOf { it.readTime }
+        val timeOfDay = allSessions
+            .asSequence()
+            .filter { filter.source == null || it.source == filter.source }
+            .groupingBy { session ->
+                val hour = java.util.Calendar.getInstance().apply { timeInMillis = session.startTime }
+                    .get(java.util.Calendar.HOUR_OF_DAY)
+                when (hour) {
+                    in 5..11 -> "早晨"
+                    in 12..17 -> "白天"
+                    in 18..23 -> "晚上"
+                    else -> "深夜"
+                }
+            }
+            .fold(0L) { total, session -> total + (session.endTime - session.startTime) }
 
         // daily stats 转 Map
         val dailyReadCounts = stats.dailyStats.associate {
@@ -356,6 +451,10 @@ class ReadRecordViewModel : ViewModel() {
             totalReadTime = if (filter.source == null) stats.totalReadTime else records.sumOf { it.readTime },
             todayReadTime = stats.todayReadTime,
             monthReadTime = monthReadTime,
+            readWords = readWords,
+            readingSpeed = if (effectiveTime > 0) readWords * 60_000L / effectiveTime else 0L,
+            timeOfDay = timeOfDay,
+            completionRate = completionRate,
             activeDays = activeDays,
             currentStreak = currentStreak,
             longestStreak = longestStreak,

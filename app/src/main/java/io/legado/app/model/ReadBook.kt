@@ -73,6 +73,8 @@ object ReadBook : CoroutineScope by MainScope() {
     var simulatedChapterSize = 0
     var durChapterIndex = 0
     var durChapterPos = 0
+    private var readRecordChapterIndex = -1
+    private var readRecordChapterPos = 0
     var isLocalBook = true
     var chapterChanged = false
     var prevTextChapter: TextChapter? = null
@@ -374,6 +376,12 @@ object ReadBook : CoroutineScope by MainScope() {
             readStartTime = now
             readRecord.lastRead = now
             readRecord.durChapterTitle = book?.durChapterTitle.orEmpty()
+            val currentChapter = book?.durChapterIndex ?: durChapterIndex
+            val words = if (currentChapter == readRecordChapterIndex) {
+                (durChapterPos - readRecordChapterPos).coerceAtLeast(0).toLong()
+            } else {
+                durChapterPos.coerceAtLeast(0).toLong()
+            }
 
             val session = ReadRecordSession(
                 deviceId = readRecord.deviceId,
@@ -381,7 +389,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 bookAuthor = readRecord.bookAuthor,
                 startTime = sessionStartTime,
                 endTime = now,
-                words = 0,
+                words = words,
                 durChapterTitle = readRecord.durChapterTitle,
                 source = ReadRecordSource.TEXT.name
             )
@@ -392,6 +400,8 @@ object ReadBook : CoroutineScope by MainScope() {
             }
 
             sessionStartTime = now
+            readRecordChapterIndex = currentChapter
+            readRecordChapterPos = durChapterPos
         }
     }
 
@@ -403,6 +413,8 @@ object ReadBook : CoroutineScope by MainScope() {
         val now = System.currentTimeMillis()
         sessionStartTime = now
         readStartTime = now
+        readRecordChapterIndex = book?.durChapterIndex ?: durChapterIndex
+        readRecordChapterPos = durChapterPos
         readRecord.lastRead = now
     }
 
