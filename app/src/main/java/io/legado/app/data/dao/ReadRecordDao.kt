@@ -84,7 +84,7 @@ interface ReadRecordDao {
             "THEN detail_sums.total_detail_time " +
             "ELSE readRecord.readTime END), 0) " +
             "FROM readRecord " +
-            "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, SUM(readTime) AS total_detail_time " +
+            "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, source, SUM(readTime) AS total_detail_time " +
             "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor, source) detail_sums " +
             "ON readRecord.deviceId = detail_sums.deviceId " +
             "AND readRecord.bookName = detail_sums.bookName " +
@@ -280,7 +280,7 @@ interface ReadRecordDao {
             "MAX(r.readTime, COALESCE(d.totalReadTime, 0)) as readTime, " +
             "r.lastRead, r.durChapterTitle, r.durChapterIndex, r.source " +
             "FROM readRecord r " +
-            "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, SUM(readTime) AS totalReadTime " +
+            "LEFT JOIN (SELECT deviceId, bookName, bookAuthor, source, SUM(readTime) AS totalReadTime " +
             "FROM readRecordDetail GROUP BY deviceId, bookName, bookAuthor, source) d " +
             "ON r.deviceId = d.deviceId AND r.bookName = d.bookName AND r.bookAuthor = d.bookAuthor AND r.source = d.source " +
             "WHERE (:query = '' OR r.bookName LIKE '%' || :query || '%' OR r.bookAuthor LIKE '%' || :query || '%') " +
