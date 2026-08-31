@@ -438,6 +438,7 @@ fun ReadRecordScreen(
                             readingSpeed = state.readingSpeed,
                             timeOfDay = state.timeOfDay,
                             completionRate = state.completionRate,
+                            completedBookCount = state.completedBookCount,
                             activeDays = state.activeDays,
                             currentStreak = state.currentStreak,
                             longestStreak = state.longestStreak,

@@ -114,8 +114,8 @@ interface ReadRecordDao {
     @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date = :date AND source = :source")
     suspend fun getDetail(deviceId: String, bookName: String, bookAuthor: String, date: String, source: String = "TEXT"): ReadRecordDetail?
 
-    @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
-    suspend fun getDetailsByBook(deviceId: String, bookName: String, bookAuthor: String): List<ReadRecordDetail>
+    @Query("SELECT * FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND (:source IS NULL OR source = :source)")
+    suspend fun getDetailsByBook(deviceId: String, bookName: String, bookAuthor: String, source: String? = null): List<ReadRecordDetail>
 
     @Query("SELECT * FROM readRecordDetail ORDER BY date DESC")
     fun getAllDetails(): Flow<List<ReadRecordDetail>>
@@ -142,8 +142,8 @@ interface ReadRecordDao {
     @Query("SELECT * FROM readRecordDetail WHERE bookName LIKE '%' || :query || '%' OR bookAuthor LIKE '%' || :query || '%' ORDER BY date DESC")
     fun searchDetails(query: String): Flow<List<ReadRecordDetail>>
 
-    @Query("DELETE FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
-    suspend fun deleteDetailsByBook(deviceId: String, bookName: String, bookAuthor: String)
+    @Query("DELETE FROM readRecordDetail WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND (:source IS NULL OR source = :source)")
+    suspend fun deleteDetailsByBook(deviceId: String, bookName: String, bookAuthor: String, source: String? = null)
 
     @Query("SELECT * FROM readRecordSession ORDER BY startTime DESC")
     fun getAllSessions(): Flow<List<ReadRecordSession>>
@@ -189,16 +189,17 @@ interface ReadRecordDao {
     @Query("SELECT * FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor ORDER BY startTime DESC")
     fun getSessionsByBookFlow(deviceId: String, bookName: String, bookAuthor: String): Flow<List<ReadRecordSession>>
 
-    @Query("SELECT * FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
-    suspend fun getSessionsByBook(deviceId: String, bookName: String, bookAuthor: String): List<ReadRecordSession>
+    @Query("SELECT * FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND (:source IS NULL OR source = :source)")
+    suspend fun getSessionsByBook(deviceId: String, bookName: String, bookAuthor: String, source: String? = null): List<ReadRecordSession>
 
-    @Query("SELECT * FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date(startTime / 1000, 'unixepoch', 'localtime') = :date ORDER BY startTime DESC")
-    suspend fun getSessionsByBookAndDate(deviceId: String, bookName: String, bookAuthor: String, date: String): List<ReadRecordSession>
+    @Query("SELECT * FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date(startTime / 1000, 'unixepoch', 'localtime') = :date AND (:source IS NULL OR source = :source) ORDER BY startTime DESC")
+    suspend fun getSessionsByBookAndDate(deviceId: String, bookName: String, bookAuthor: String, date: String, source: String? = null): List<ReadRecordSession>
 
     @Query(
         "SELECT * FROM readRecordSession " +
             "WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor " +
-            "AND startTime = :startTime AND endTime = :endTime AND words = :words LIMIT 1"
+            "AND startTime = :startTime AND endTime = :endTime AND words = :words " +
+            "AND (:source IS NULL OR source = :source) LIMIT 1"
     )
     suspend fun getSessionExact(
         deviceId: String,
@@ -206,14 +207,15 @@ interface ReadRecordDao {
         bookAuthor: String,
         startTime: Long,
         endTime: Long,
-        words: Long
+        words: Long,
+        source: String? = null
     ): ReadRecordSession?
 
-    @Query("DELETE FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor")
-    suspend fun deleteSessionsByBook(deviceId: String, bookName: String, bookAuthor: String)
+    @Query("DELETE FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND (:source IS NULL OR source = :source)")
+    suspend fun deleteSessionsByBook(deviceId: String, bookName: String, bookAuthor: String, source: String? = null)
 
-    @Query("DELETE FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date(startTime / 1000, 'unixepoch', 'localtime') = :date")
-    suspend fun deleteSessionsByBookAndDate(deviceId: String, bookName: String, bookAuthor: String, date: String)
+    @Query("DELETE FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND date(startTime / 1000, 'unixepoch', 'localtime') = :date AND (:source IS NULL OR source = :source)")
+    suspend fun deleteSessionsByBookAndDate(deviceId: String, bookName: String, bookAuthor: String, date: String, source: String? = null)
 
     // ==================== SQL 聚合查询（方案三：下推到数据库层） ====================
 

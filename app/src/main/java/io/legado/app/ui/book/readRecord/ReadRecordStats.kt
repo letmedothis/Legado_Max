@@ -8,6 +8,7 @@ enum class ReadTimeSlot(val label: String) {
     EVENING("晚上")
 }
 
+/** 根据本地小时返回阅读时段；越界值会按 0~23 归一化。 */
 fun readTimeSlotForHour(hour: Int): ReadTimeSlot {
     return when (hour.coerceIn(0, 23)) {
         in 5..11 -> ReadTimeSlot.MORNING
@@ -18,7 +19,7 @@ fun readTimeSlotForHour(hour: Int): ReadTimeSlot {
 }
 
 /** 返回每分钟阅读字数；没有有效时长时返回 0，避免出现无意义的极大值。 */
-fun readingSpeed(words: Long, durationMillis: Long): Long {
+fun calculateReadingSpeed(words: Long, durationMillis: Long): Long {
     if (words <= 0L || durationMillis <= 0L) return 0L
     return words * 60_000L / durationMillis
 }

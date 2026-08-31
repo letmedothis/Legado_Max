@@ -9,6 +9,7 @@ import io.legado.app.data.dao.DailyReadStat
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.entities.readRecord.ReadRecordSource
 import io.legado.app.data.repository.BookRepository
 import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.help.config.AppConfig
@@ -34,15 +35,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import splitties.init.appCtx
 
-private typealias RecordIdentity = Triple<String, String, String>
+data class RecordIdentity(
+    val deviceId: String,
+    val bookName: String,
+    val bookAuthor: String,
+    val source: String
+)
 
 data class ReadRecordUiState(
     val isLoading: Boolean = true,
@@ -51,11 +59,9 @@ data class ReadRecordUiState(
     val monthReadTime: Long = 0,
     val readWords: Long = 0,
     val readingSpeed: Long = 0,
-    val timeSlotStats: Map<ReadTimeSlot, Long> = emptyMap(),
-    val completionRate: Int = 0,
-    val completedBookCount: Int = 0,
     val timeOfDay: Map<String, Long> = emptyMap(),
     val completionRate: Int = 0,
+    val completedBookCount: Int = 0,
     val activeDays: Int = 0,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
@@ -178,12 +184,12 @@ class ReadRecordViewModel : ViewModel() {
 
     /** 统计用详情流使用分页加载，避免一次性从 Room 读取超大 Cursor。 */
     private val statsDetailsFlow = filterState.flatMapLatest { filter ->
-        repository.getFilteredDetails("", null)
+        repository.getFilteredDetails(filter.query, filter.dateStr)
             .map { details -> details.filter { filter.source == null || it.source == filter.source } }
     }
 
     private val statsSessionsFlow = filterState.flatMapLatest { filter ->
-        repository.getFilteredSessions("", null)
+        repository.getFilteredSessions(filter.query, filter.dateStr)
             .map { sessions -> sessions.filter { filter.source == null || it.source == filter.source } }
     }
 
@@ -194,16 +200,17 @@ class ReadRecordViewModel : ViewModel() {
         statsSessionsFlow
     ) { base, filter, details, sessions ->
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        val dailyStats = if (filter.source == null) {
+        val hasFilter = filter.query.isNotBlank() || filter.dateStr != null || filter.source != null
+        val dailyStats = if (!hasFilter) {
             base.dailyStats
         } else {
             details.groupBy { it.date }.map { (date, items) ->
                 DailyReadStat(date, items.size, items.sumOf { it.readTime })
             }.sortedByDescending { it.date }
         }
-        val totalReadTime = if (filter.source == null) base.totalReadTime else details.sumOf { it.readTime }
-        val todayReadTime = if (filter.source == null) base.todayReadTime else details.filter { it.date == today }.sumOf { it.readTime }
-        val todayBookCount = if (filter.source == null) base.todayBookCount else details.asSequence()
+        val totalReadTime = if (!hasFilter) base.totalReadTime else details.sumOf { it.readTime }
+        val todayReadTime = if (!hasFilter) base.todayReadTime else details.filter { it.date == today }.sumOf { it.readTime }
+        val todayBookCount = if (!hasFilter) base.todayBookCount else details.asSequence()
             .filter { it.date == today }
             .map { Triple(it.deviceId, it.bookName, it.bookAuthor) }
             .distinct()
@@ -215,16 +222,32 @@ class ReadRecordViewModel : ViewModel() {
         StatsData(totalReadTime, dailyStats, todayReadTime, todayBookCount, details.sumOf { it.readWords }, timeSlots)
     }
 
+    /**
+     * 阅读记录 Flow（SummaryCard + LATEST / READ_TIME 模式共用）。
+     */
+    private val recordsFlow = filterState.flatMapLatest { filter ->
+        val records = if (filter.dateStr == null) {
+            repository.getRecordsWithDetailTime(filter.query)
+        } else {
+            repository.getRecordsByDate(filter.query, filter.dateStr)
+        }
+        records.map { items -> items.filter { filter.source == null || it.source == filter.source } }
+    }
+
     private val completionFlow = recordsFlow.mapLatest { records ->
         if (records.isEmpty()) return@mapLatest CompletionData()
         val percentages = coroutineScope {
             records.map { record ->
                 async(Dispatchers.IO) {
                     val key = "${record.bookName}\u0000${record.bookAuthor}"
-                    val chapterCount = chapterCountCache[key] ?: bookRepository.getChapterCount(record.bookName, record.bookAuthor).also {
-                        chapterCountCache[key] = it
-                    }
-                    completionPercent(record.durChapterIndex, chapterCount)
+                    val chapterCount = chapterCountCache[key]
+                        ?: bookRepository.getChapterCount(record.bookName, record.bookAuthor).also {
+                            chapterCountCache[key] = it
+                        }
+                    completionPercent(
+                        record.durChapterIndex,
+                        chapterCount
+                    )
                 }
             }.awaitAll()
         }
@@ -233,17 +256,6 @@ class ReadRecordViewModel : ViewModel() {
             completedCount = percentages.count { it >= 100 }
         )
     }
-
-    /**
-     * 阅读记录 Flow（SummaryCard + LATEST / READ_TIME 模式共用）。
-     */
-    private val recordsFlow = filterState.flatMapLatest { filter ->
-        if (filter.dateStr == null) {
-            repository.getRecordsWithDetailTime(filter.query)
-        } else {
-            repository.getRecordsByDate(filter.query, filter.dateStr)
-        }
-    }.map { records -> records.filter { _sourceFilter.value == null || it.source == _sourceFilter.value } }
 
     /**
      * 按显示模式加载的额外数据 Flow。
@@ -385,8 +397,9 @@ class ReadRecordViewModel : ViewModel() {
         ExtraState(sessions, hasMore, loadingMore, isSel, selRecs)
     }
 
-    private val allSessionsFlow = repository.getAllSessions()
-    private val completionRateFlow = recordsFlow.map { repository.getCompletionRate(it) }.flowOn(Dispatchers.IO)
+    private val extraAndCompletionState = combine(extraState, completionFlow) { extra, completion ->
+        extra to completion
+    }
 
     /**
      * UI 状态 Flow —— 组合统计数据、记录、模式数据、筛选状态和额外状态（timeline 分页 + 选择模式）。
@@ -396,32 +409,20 @@ class ReadRecordViewModel : ViewModel() {
         recordsFlow,
         modeDataFlow,
         filterState,
-        extraState,
-        allSessionsFlow,
-        completionRateFlow
-    ) { stats, records, modeData, filter, extra, allSessions, completionRate ->
+        extraAndCompletionState
+    ) { stats, records, modeData, filter, extraAndCompletion ->
+        val (extra, completion) = extraAndCompletion
         val selectedDate = filter.dateStr?.let { LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE) }
 
         // AGGREGATE 模式：details 按 date 分组
         val groupedRecords = modeData.details
             ?.groupBy { it.date }
             ?: emptyMap()
-        val readWords = modeData.details?.sumOf { it.readWords } ?: 0L
-        val effectiveTime = if (filter.source == null) stats.totalReadTime else records.sumOf { it.readTime }
-        val timeOfDay = allSessions
-            .asSequence()
-            .filter { filter.source == null || it.source == filter.source }
-            .groupingBy { session ->
-                val hour = java.util.Calendar.getInstance().apply { timeInMillis = session.startTime }
-                    .get(java.util.Calendar.HOUR_OF_DAY)
-                when (hour) {
-                    in 5..11 -> "早晨"
-                    in 12..17 -> "白天"
-                    in 18..23 -> "晚上"
-                    else -> "深夜"
-                }
-            }
-            .fold(0L) { total, session -> total + (session.endTime - session.startTime) }
+        val readWords = stats.totalReadWords
+        val effectiveTime = stats.totalReadTime
+        val timeOfDay = stats.timeSlotStats
+            .filterValues { it > 0L }
+            .mapKeys { it.key.label }
 
         // daily stats 转 Map
         val dailyReadCounts = stats.dailyStats.associate {
@@ -448,13 +449,14 @@ class ReadRecordViewModel : ViewModel() {
 
         ReadRecordUiState(
             isLoading = false,
-            totalReadTime = if (filter.source == null) stats.totalReadTime else records.sumOf { it.readTime },
+            totalReadTime = stats.totalReadTime,
             todayReadTime = stats.todayReadTime,
             monthReadTime = monthReadTime,
             readWords = readWords,
-            readingSpeed = if (effectiveTime > 0) readWords * 60_000L / effectiveTime else 0L,
+            readingSpeed = calculateReadingSpeed(readWords, effectiveTime),
             timeOfDay = timeOfDay,
-            completionRate = completionRate,
+            completionRate = completion.rate,
+            completedBookCount = completion.completedCount,
             activeDays = activeDays,
             currentStreak = currentStreak,
             longestStreak = longestStreak,
@@ -599,17 +601,17 @@ class ReadRecordViewModel : ViewModel() {
 
     fun enterSelectionMode(record: ReadRecord) {
         _isSelectionMode.value = true
-        _selectedRecords.value = setOf(recordIdentity(record.deviceId, record.bookName, record.bookAuthor))
+        _selectedRecords.value = setOf(recordIdentity(record.deviceId, record.bookName, record.bookAuthor, record.source))
     }
 
     fun enterSelectionMode(detail: ReadRecordDetail) {
         _isSelectionMode.value = true
-        _selectedRecords.value = setOf(recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor))
+        _selectedRecords.value = setOf(recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor, detail.source))
     }
 
     fun enterSelectionMode(session: ReadRecordSession) {
         _isSelectionMode.value = true
-        _selectedRecords.value = setOf(recordIdentity(session.deviceId, session.bookName, session.bookAuthor))
+        _selectedRecords.value = setOf(recordIdentity(session.deviceId, session.bookName, session.bookAuthor, session.source))
     }
 
     fun exitSelectionMode() {
@@ -618,17 +620,17 @@ class ReadRecordViewModel : ViewModel() {
     }
 
     fun toggleRecordSelection(record: ReadRecord) {
-        val identity = recordIdentity(record.deviceId, record.bookName, record.bookAuthor)
+        val identity = recordIdentity(record.deviceId, record.bookName, record.bookAuthor, record.source)
         toggleIdentitySelection(identity)
     }
 
     fun toggleRecordSelection(detail: ReadRecordDetail) {
-        val identity = recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor)
+        val identity = recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor, detail.source)
         toggleIdentitySelection(identity)
     }
 
     fun toggleRecordSelection(session: ReadRecordSession) {
-        val identity = recordIdentity(session.deviceId, session.bookName, session.bookAuthor)
+        val identity = recordIdentity(session.deviceId, session.bookName, session.bookAuthor, session.source)
         toggleIdentitySelection(identity)
     }
 
@@ -650,22 +652,22 @@ class ReadRecordViewModel : ViewModel() {
         when (displayMode) {
             DisplayMode.LATEST -> {
                 allIdentities.addAll(uiState.value.latestRecords.map { 
-                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor) 
+                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source)
                 })
             }
             DisplayMode.READ_TIME -> {
                 allIdentities.addAll(uiState.value.readTimeRecords.map { 
-                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor) 
+                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source)
                 })
             }
             DisplayMode.AGGREGATE -> {
                 allIdentities.addAll(uiState.value.groupedRecords.values.flatten().map { 
-                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor) 
+                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source)
                 })
             }
             DisplayMode.TIMELINE -> {
                 allIdentities.addAll(uiState.value.timelineRecords.values.flatten().map { 
-                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor) 
+                    recordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source)
                 })
             }
         }
@@ -676,9 +678,10 @@ class ReadRecordViewModel : ViewModel() {
         viewModelScope.launch {
             val selectedList = _selectedRecords.value.map { identity ->
                 ReadRecord(
-                    deviceId = identity.first,
-                    bookName = identity.second,
-                    bookAuthor = identity.third
+                    deviceId = identity.deviceId,
+                    bookName = identity.bookName,
+                    bookAuthor = identity.bookAuthor,
+                    source = identity.source
                 )
             }
             selectedList.forEach { record ->
@@ -713,22 +716,27 @@ class ReadRecordViewModel : ViewModel() {
     }
 
     fun isSelected(record: ReadRecord): Boolean {
-        return _selectedRecords.value.contains(recordIdentity(record.deviceId, record.bookName, record.bookAuthor))
+        return _selectedRecords.value.contains(recordIdentity(record.deviceId, record.bookName, record.bookAuthor, record.source))
     }
 
     fun isSelected(detail: ReadRecordDetail): Boolean {
-        return _selectedRecords.value.contains(recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor))
+        return _selectedRecords.value.contains(recordIdentity(detail.deviceId, detail.bookName, detail.bookAuthor, detail.source))
     }
 
     fun isSelected(session: ReadRecordSession): Boolean {
-        return _selectedRecords.value.contains(recordIdentity(session.deviceId, session.bookName, session.bookAuthor))
+        return _selectedRecords.value.contains(recordIdentity(session.deviceId, session.bookName, session.bookAuthor, session.source))
     }
 
     private fun cacheKey(bookName: String, bookAuthor: String) = "$bookName|$bookAuthor"
 }
 
-private fun recordIdentity(deviceId: String, bookName: String, bookAuthor: String): RecordIdentity {
-    return Triple(deviceId, bookName, bookAuthor)
+private fun recordIdentity(
+    deviceId: String,
+    bookName: String,
+    bookAuthor: String,
+    source: String = ReadRecordSource.TEXT.name
+): RecordIdentity {
+    return RecordIdentity(deviceId, bookName, bookAuthor, source)
 }
 
 /**

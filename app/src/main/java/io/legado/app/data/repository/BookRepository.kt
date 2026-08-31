@@ -9,6 +9,11 @@ import splitties.init.appCtx
 
 class BookRepository {
 
+    suspend fun getChapterCount(bookName: String, bookAuthor: String): Int {
+        val book = appDb.bookDao.getBook(bookName, bookAuthor) ?: return 0
+        return appDb.bookChapterDao.getChapterCount(book.bookUrl)
+    }
+
     suspend fun getChapterTitle(bookName: String, bookAuthor: String, chapterIndex: Int): String? {
         val book = appDb.bookDao.getBook(bookName, bookAuthor) ?: return null
         val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex) ?: return null

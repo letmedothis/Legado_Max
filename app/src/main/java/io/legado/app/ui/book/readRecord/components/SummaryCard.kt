@@ -37,6 +37,7 @@ fun SummaryCard(
     readingSpeed: Long,
     timeOfDay: Map<String, Long>,
     completionRate: Int,
+    completedBookCount: Int,
     activeDays: Int,
     currentStreak: Int,
     longestStreak: Int,
@@ -117,13 +118,13 @@ fun SummaryCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     StatItem(
-                        label = "阅读字数",
+                        label = stringResource(R.string.rr_read_words),
                         value = "${readWords}字",
                         modifier = Modifier.weight(1f)
                     )
                     StatItem(
-                        label = "阅读速度",
-                        value = "${readingSpeed}字/分钟",
+                        label = stringResource(R.string.rr_reading_speed),
+                        value = stringResource(R.string.rr_words_per_minute, readingSpeed),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -131,7 +132,7 @@ fun SummaryCard(
 
             if (timeOfDay.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("阅读时段", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor)
+                Text(stringResource(R.string.rr_reading_period), style = MaterialTheme.typography.labelSmall, color = secondaryTextColor)
                 Text(
                     timeOfDay.entries.sortedByDescending { it.value }
                         .joinToString(" · ") { "${it.key} ${formatReadDuration(context, it.value)}" },
@@ -142,7 +143,11 @@ fun SummaryCard(
 
             if (completionRate > 0) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("当前书籍平均完成率：${completionRate}%", style = MaterialTheme.typography.bodySmall, color = secondaryTextColor)
+                Text(
+                    stringResource(R.string.rr_completion_average, completionRate, completedBookCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryTextColor
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

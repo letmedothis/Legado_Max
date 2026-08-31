@@ -1920,6 +1920,11 @@
     <string name="rr_today_read_time">Today</string>
     <string name="rr_month_read_time">This Month</string>
     <string name="rr_total_read_time_label">Total Time</string>
+    <string name="rr_read_words">Words Read</string>
+    <string name="rr_reading_speed">Reading Speed</string>
+    <string name="rr_words_per_minute">%d words/min</string>
+    <string name="rr_reading_period">Reading Periods</string>
+    <string name="rr_completion_average">Average completion: %1$d%% (%2$d books completed)</string>
     <string name="rr_active_days">Active Days</string>
     <string name="rr_active_days_value_single">1 day</string>
     <string name="rr_active_days_value">%d days</string>

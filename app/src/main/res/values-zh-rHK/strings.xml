@@ -1950,6 +1950,11 @@
     <string name="rr_today_read_time">今日時長</string>
     <string name="rr_month_read_time">本月時長</string>
     <string name="rr_total_read_time_label">累計時長</string>
+    <string name="rr_read_words">閱讀字數</string>
+    <string name="rr_reading_speed">閱讀速度</string>
+    <string name="rr_words_per_minute">%d字/分鐘</string>
+    <string name="rr_reading_period">閱讀時段</string>
+    <string name="rr_completion_average">目前書籍平均完成率：%1$d%%（已完成%2$d本）</string>
     <string name="rr_active_days">活躍日</string>
     <string name="rr_active_days_value_single">1天</string>
     <string name="rr_active_days_value">%d天</string>
