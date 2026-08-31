@@ -168,7 +168,7 @@ jobs:
                 output_name="legado_测试版_${VERSION}_原包名${abi_part}.apk"
                 ;;
               releaseS)
-                output_name="legado_正式版_${VERSION}_共存版${abi_part}.apk"
+                output_name="legado_正式版_${VERSION}_共存${abi_part}.apk"
                 ;;
               releaseLegacy)
                 output_name="legado_兼容版_${VERSION}_旧版覆盖${abi_part}.apk"
