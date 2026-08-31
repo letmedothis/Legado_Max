@@ -10,6 +10,9 @@ on:
       - my-changes
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 # 同一个分支连续 push 时，取消旧任务，节省资源
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -43,6 +46,23 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare release metadata
+        id: metadata
+        shell: bash
+        run: |
+          VERSION="$(date -d '8 hour' -u +3.%y.%m%d%H)"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          # Keep the APK version, release tag, and release notes tied to this run.
+          sed -i -E "s/^def version = .*/def version = \"${VERSION}\"/" app/build.gradle
+          {
+            echo "VERSION=${VERSION}"
+            echo "RELEASE_TAG=debug-${VERSION}-${SHORT_SHA}"
+            echo "UPDATE_LOG<<RELEASE_NOTES_EOF"
+            git log -5 --no-merges --pretty=format:'- %s (%h)'
+            echo
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Build Debug APK
         run: |
           chmod +x gradlew
@@ -56,3 +76,35 @@ jobs:
           # 指定打包后的 APK 路径，如果你的输出路径不同请自行修改
           path: app/build/outputs/apk/appMax/debug/*.apk
           retention-days: 7 # 保留 7 天，过期自动清理
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: 阅读Max Debug ${{ env.VERSION }}
+          body: |
+            ## 版本说明
+
+            这是 `my-changes` 开发分支的 Debug 构建包，适合体验新功能和收集日志。
+
+            - 版本号：`${{ env.VERSION }}`
+            - 提交：`${{ github.sha }}`
+            - 分支：`${{ github.ref_name }}`
+
+            ## 架构说明
+
+            当前 Debug 构建为 `universal` 通用 APK，包含 `arm64-v8a` 和 `armeabi-v7a` 支持，适合绝大多数 ARM Android 设备。
+
+            ## 更新内容
+
+            ${{ env.UPDATE_LOG }}
+
+            ## Assets
+
+            APK 文件名中的 `_universal` 表示通用架构包。
+          prerelease: true
+          make_latest: false
+          files: app/build/outputs/apk/appMax/debug/*.apk
+          fail_on_unmatched_files: true
