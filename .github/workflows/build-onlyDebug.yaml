@@ -1,13 +1,14 @@
 name: Build Debug APK
 
 on:
-  # 只有当代码推送到 test 分支，或者提交 PR 到 test 分支时才会触发
+  # main 只同步上游；自定义开发分支推送后自动产出可安装包。
   push:
     branches:
-      - test
+      - my-changes
   pull_request:
     branches:
-      - test
+      - my-changes
+  workflow_dispatch:
 
 # 同一个分支连续 push 时，取消旧任务，节省资源
 concurrency:
