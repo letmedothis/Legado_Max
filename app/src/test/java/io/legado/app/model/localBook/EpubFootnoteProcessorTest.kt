@@ -57,6 +57,40 @@ class EpubFootnoteProcessorTest {
     }
 
     @Test
+    fun `静火 custom zy reference and hl note are supported`() {
+        val body = body(
+            """
+            <p>正文<a class="zy" href="#id1a" id="id1">〔1〕</a>结束。</p>
+            <p class="zs"><a class="hl" href="#id1" id="id1a">〔1〕</a>静火版注解内容。</p>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "Text/chapter.xhtml"))
+        assertEquals(
+            EpubFootnote("〔1〕", "静火版注解内容。"),
+            EpubFootnoteLink.decode(body.selectFirst("a.zy")!!.attr("href"))
+        )
+        assertNull(body.getElementById("id1a"))
+    }
+
+    @Test
+    fun `common epub2 footnote rel and container are supported`() {
+        val body = body(
+            """
+            <p>正文<sup><a rel="footnote" href="#fn1">1</a></sup></p>
+            <div class="footnotes"><ol><li id="fn1">通用 EPUB2 注解</li></ol></div>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            EpubFootnote("1", "通用 EPUB2 注解"),
+            EpubFootnoteLink.decode(body.selectFirst("a[rel=footnote]")!!.attr("href"))
+        )
+        assertNull(body.getElementById("fn1"))
+    }
+
+    @Test
     fun `cross resource footnote resolves relative path`() {
         val body = body("<p>正文<a epub:type=\"noteref\" href=\"../notes/end.xhtml#n1\">*</a></p>")
         var requestedHref: String? = null

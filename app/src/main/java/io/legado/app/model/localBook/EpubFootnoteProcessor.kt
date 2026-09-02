@@ -17,6 +17,12 @@ object EpubFootnoteProcessor {
     private val invisibleTextRegex = Regex("[\\u200B-\\u200D\\u2060\\uFEFF]")
     private val whitespaceRegex = Regex("\\s+")
     private val blockTags = setOf("p", "div", "li", "section", "article", "blockquote")
+    private val commonReferenceClasses = setOf(
+        "footnote-ref", "footnote-reference", "fnref", "fn-ref", "noteref", "note-ref"
+    )
+    private val commonTargetClasses = setOf(
+        "footnote", "footnote-item", "endnote", "endnote-item", "fn", "fn-content", "note"
+    )
 
     /**
      * @param resourceLoader 按 EPUB 根目录相对路径加载目标文档 body，用于处理跨文件脚注。
@@ -49,14 +55,12 @@ object EpubFootnoteProcessor {
                     ?: return@mapNotNull null
             }
             val target = targetBody.getElementById(fragmentId) ?: return@mapNotNull null
-            if (!isNoteTarget(target) && !anchor.hasClass("duokan-footnote")) {
-                return@mapNotNull null
-            }
-            val footnoteContent = extractContent(target, anchor).takeIf { it.isNotBlank() }
+            val noteTarget = resolveNoteTarget(target, anchor) ?: return@mapNotNull null
+            val footnoteContent = extractContent(noteTarget, anchor).takeIf { it.isNotBlank() }
                 ?: return@mapNotNull null
             ResolvedReference(
                 anchor = anchor,
-                target = target,
+                target = noteTarget,
                 targetIsInCurrentBody = targetBody === body,
                 footnote = EpubFootnote(
                     label = anchor.text().trim(),
@@ -98,16 +102,32 @@ object EpubFootnoteProcessor {
 
     private fun isNoteReference(anchor: Element): Boolean {
         return anchor.hasClass("duokan-footnote") ||
+            anchor.hasClass("zy") ||
+            anchor.classNames().any { it.lowercase() in commonReferenceClasses } ||
+            anchor.attributeTokens("rel").any { it.lowercase() in setOf("footnote", "endnote", "note") } ||
             anchor.attributeTokens("epub:type").contains("noteref") ||
             anchor.attributeTokens("role").contains("doc-noteref")
     }
 
     private fun isNoteTarget(target: Element): Boolean {
         return target.hasClass("duokan-footnote-item") ||
+            target.classNames().any { it.lowercase() in commonTargetClasses } ||
+            target.parents().any { parent ->
+                parent.classNames().any {
+                    it.lowercase() in setOf("footnotes", "endnotes", "footnote-list", "endnote-list")
+                }
+            } ||
             target.attributeTokens("epub:type").any { it == "footnote" || it == "endnote" } ||
             target.attributeTokens("role").any {
                 it == "doc-footnote" || it == "doc-endnote"
             }
+    }
+
+    private fun resolveNoteTarget(target: Element, reference: Element): Element? {
+        if (reference.hasClass("zy") && target.hasClass("hl")) {
+            return target.parents().firstOrNull { it.hasClass("zs") }
+        }
+        return target.takeIf { isNoteTarget(it) }
     }
 
     private fun extractContent(target: Element, reference: Element): String {
@@ -135,6 +155,9 @@ object EpubFootnoteProcessor {
     private fun removeEmptyNoteGroups(body: Element) {
         body.select("ol, ul, section, aside, div").filter { element ->
             val isNoteGroup = element.hasClass("duokan-footnote-content") ||
+                element.classNames().any {
+                    it.lowercase() in setOf("footnotes", "endnotes", "footnote-list", "endnote-list")
+                } ||
                 element.attributeTokens("epub:type").any {
                     it == "footnotes" || it == "endnotes"
                 } ||
