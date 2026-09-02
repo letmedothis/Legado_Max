@@ -16,13 +16,27 @@ object EpubFootnoteProcessor {
         Regex("<usehtml>.*?</usehtml>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val invisibleTextRegex = Regex("[\\u200B-\\u200D\\u2060\\uFEFF]")
     private val whitespaceRegex = Regex("\\s+")
-    private val blockTags = setOf("p", "div", "li", "section", "article", "blockquote")
+    private val blockTags = setOf(
+        "p", "div", "li", "section", "article", "blockquote",
+        "h1", "h2", "h3", "h4", "h5", "h6"
+    )
+    private val noteEntryTags = setOf("li", "p", "div", "aside", "section", "article")
     private val commonReferenceClasses = setOf(
-        "footnote-ref", "footnote-reference", "fnref", "fn-ref", "noteref", "note-ref"
+        "footnote", "footnoteref", "footnotereference", "footnotelink", "footnoteanchor",
+        "fnref", "fnanchor", "fnlink", "noteref", "notelink", "endnoteref",
+        "endnotereference", "endnotelink", "enref", "sdfootnoteanc"
     )
     private val commonTargetClasses = setOf(
-        "footnote", "footnote-item", "endnote", "endnote-item", "fn", "fn-content", "note"
+        "footnote", "footnote1", "footnoteitem", "footnotetext", "endnote", "endnoteitem",
+        "endnotetext", "fn", "fncontent", "fnote", "fnote1", "fntext", "note", "note1",
+        "note2", "note3", "sdfootnote"
     )
+    private val noteGroupClasses = setOf(
+        "footnotes", "endnotes", "rearnotes", "footnotelist", "endnotelist", "rearnotelist"
+    )
+    private val noteReferenceTypes = setOf("noteref", "annoref")
+    private val noteTargetTypes = setOf("footnote", "endnote", "note", "rearnote", "annotation")
+    private val noteGroupTypes = setOf("footnotes", "endnotes", "rearnotes")
 
     /**
      * @param resourceLoader 按 EPUB 根目录相对路径加载目标文档 body，用于处理跨文件脚注。
@@ -36,7 +50,7 @@ object EpubFootnoteProcessor {
         val sourcePath = normalizeResourceHref("", sourceHref) ?: sourceHref
         val externalBodies = mutableMapOf<String, Element?>()
         val resolved = body.select("a[href]").mapNotNull { anchor ->
-            if (!isNoteReference(anchor)) return@mapNotNull null
+            if (isBacklink(anchor)) return@mapNotNull null
             val href = anchor.attr("href").trim()
             val fragmentId = href.substringAfter('#', "").takeIf { it.isNotBlank() }
                 ?.let(::decodeComponent)
@@ -103,23 +117,29 @@ object EpubFootnoteProcessor {
     private fun isNoteReference(anchor: Element): Boolean {
         return anchor.hasClass("duokan-footnote") ||
             anchor.hasClass("zy") ||
-            anchor.classNames().any { it.lowercase() in commonReferenceClasses } ||
-            anchor.attributeTokens("rel").any { it.lowercase() in setOf("footnote", "endnote", "note") } ||
-            anchor.attributeTokens("epub:type").contains("noteref") ||
+            anchor.hasCommonClass(commonReferenceClasses) ||
+            anchor.attributeTokens("rel").any { it in setOf("footnote", "endnote", "note") } ||
+            anchor.attributeTokens("type").any { it in setOf("footnote", "endnote", "note") } ||
+            anchor.attributeTokens("epub:type").any { it in noteReferenceTypes } ||
             anchor.attributeTokens("role").contains("doc-noteref")
     }
 
-    private fun isNoteTarget(target: Element): Boolean {
+    private fun isIndividualNoteTarget(target: Element): Boolean {
         return target.hasClass("duokan-footnote-item") ||
-            target.classNames().any { it.lowercase() in commonTargetClasses } ||
-            target.parents().any { parent ->
-                parent.classNames().any {
-                    it.lowercase() in setOf("footnotes", "endnotes", "footnote-list", "endnote-list")
-                }
-            } ||
-            target.attributeTokens("epub:type").any { it == "footnote" || it == "endnote" } ||
+            // Asciidoctor 等工具也会给引用外层 sup 加 footnote 类，类名仅在条目容器上作证据。
+            (target.tagName() in noteEntryTags && target.hasCommonClass(commonTargetClasses)) ||
+            target.attributeTokens("epub:type").any { it in noteTargetTypes } ||
             target.attributeTokens("role").any {
                 it == "doc-footnote" || it == "doc-endnote"
+            }
+    }
+
+    private fun isNoteGroup(element: Element): Boolean {
+        return element.hasClass("duokan-footnote-content") ||
+            element.hasCommonClass(noteGroupClasses) ||
+            element.attributeTokens("epub:type").any { it in noteGroupTypes } ||
+            element.attributeTokens("role").any {
+                it == "doc-footnotes" || it == "doc-endnotes"
             }
     }
 
@@ -127,18 +147,28 @@ object EpubFootnoteProcessor {
         if (reference.hasClass("zy") && target.hasClass("hl")) {
             return target.parents().firstOrNull { it.hasClass("zs") }
         }
-        return target.takeIf { isNoteTarget(it) }
+        if (isIndividualNoteTarget(target)) return target
+        target.parents().firstOrNull(::isIndividualNoteTarget)?.let { return it }
+
+        if (isNoteReference(reference) && reference.id().isNotBlank()) {
+            val hasReciprocalBacklink = target.select("a[href]").any {
+                it.attr("href").substringAfterLast('#') == reference.id()
+            }
+            if (hasReciprocalBacklink) {
+                return target.takeIf { it.tagName() in noteEntryTags } ?: target.parents()
+                    .firstOrNull { it.tagName() in noteEntryTags }
+            }
+        }
+
+        val noteGroup = target.parents().firstOrNull(::isNoteGroup) ?: return null
+        return target.takeIf { it.tagName() in noteEntryTags } ?: target.parents()
+            .firstOrNull { it !== noteGroup && it.tagName() in noteEntryTags }
     }
 
     private fun extractContent(target: Element, reference: Element): String {
         val clone = target.clone()
         clone.select("script, style").remove()
-        clone.select("a[href]").filter { link ->
-            link.attributeTokens("epub:type").contains("backlink") ||
-                link.attributeTokens("role").contains("doc-backlink") ||
-                reference.id().isNotBlank() &&
-                link.attr("href").substringAfterLast('#') == reference.id()
-        }.forEach(Element::remove)
+        clone.select("a[href]").filter { isBacklink(it, reference.id()) }.forEach(Element::remove)
         return clone.text()
             .replace('\u00A0', ' ')
             .replace(invisibleTextRegex, "")
@@ -153,19 +183,20 @@ object EpubFootnoteProcessor {
     }
 
     private fun removeEmptyNoteGroups(body: Element) {
-        body.select("ol, ul, section, aside, div").filter { element ->
-            val isNoteGroup = element.hasClass("duokan-footnote-content") ||
-                element.classNames().any {
-                    it.lowercase() in setOf("footnotes", "endnotes", "footnote-list", "endnote-list")
-                } ||
-                element.attributeTokens("epub:type").any {
-                    it == "footnotes" || it == "endnotes"
-                } ||
-                element.attributeTokens("role").any {
-                    it == "doc-footnotes" || it == "doc-endnotes"
-                }
-            isNoteGroup && element.text().isBlank()
-        }.forEach(Element::remove)
+        body.getAllElements().filter { isNoteGroup(it) && it.text().isBlank() }
+            .forEach(Element::remove)
+    }
+
+    private fun isBacklink(link: Element, referenceId: String = ""): Boolean {
+        return link.attributeTokens("epub:type").contains("backlink") ||
+            link.attributeTokens("role").contains("doc-backlink") ||
+            link.attributeTokens("rel").contains("backlink") ||
+            link.attributeTokens("rev").any { it in setOf("footnote", "endnote", "note") } ||
+            link.hasCommonClass(
+                setOf("backlink", "footnoteback", "footnotebackref", "reversefootnote")
+            ) ||
+            referenceId.isNotBlank() &&
+            link.attr("href").substringAfterLast('#') == referenceId
     }
 
     private fun normalizeResourceHref(sourceHref: String, targetHref: String): String? {
@@ -183,7 +214,14 @@ object EpubFootnoteProcessor {
         URLDecoder.decode(value, Charsets.UTF_8.name())
 
     private fun Element.attributeTokens(name: String): Set<String> =
-        attr(name).trim().split(whitespaceRegex).filter { it.isNotBlank() }.toSet()
+        attr(name).trim().split(whitespaceRegex).filter { it.isNotBlank() }
+            .map { it.lowercase() }.toSet()
+
+    private fun Element.hasCommonClass(classes: Set<String>): Boolean =
+        classNames().any { it.normalizedClassName() in classes }
+
+    private fun String.normalizedClassName(): String =
+        lowercase().replace("-", "").replace("_", "")
 
     private data class ResolvedReference(
         val anchor: Element,

@@ -14,7 +14,9 @@ class EpubContentCacheTest {
     }
 
     @Test
-    fun `legacy unversioned cache is invalid`() {
+    fun `cache from before extended footnote support is invalid`() {
+        assertNull(EpubContentCache.decode("LEGADO_EPUB_CONTENT_V2\n旧版正文缓存"))
+        assertNull(EpubContentCache.decode("LEGADO_EPUB_CONTENT_V3\n旧版正文缓存"))
         assertNull(EpubContentCache.decode("旧版正文缓存"))
     }
 }

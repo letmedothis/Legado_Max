@@ -91,6 +91,100 @@ class EpubFootnoteProcessorTest {
     }
 
     @Test
+    fun `dpub endnotes group supports entries without individual roles`() {
+        val body = body(
+            """
+            <p>正文<a role="doc-noteref" href="#endnote-1">1</a></p>
+            <section role="doc-endnotes">
+              <ol><li id="endnote-1">DPUB 1.1 尾注</li></ol>
+            </section>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "DPUB 1.1 尾注",
+            EpubFootnoteLink.decode(body.selectFirst("a[role=doc-noteref]")!!.attr("href"))?.content
+        )
+        assertTrue(body.select("section[role=doc-endnotes]").isEmpty())
+    }
+
+    @Test
+    fun `legacy epub annotation and rearnote semantics are supported`() {
+        val body = body(
+            """
+            <p>正文<a epub:type="annoref" href="#annotation-1">甲</a></p>
+            <aside id="annotation-1" epub:type="annotation">旧版批注内容</aside>
+            <p>正文<a epub:type="noteref" href="#rear-1">乙</a></p>
+            <section epub:type="rearnotes"><ol>
+              <li id="rear-1" epub:type="rearnote">旧版后置注释</li>
+            </ol></section>
+            """
+        )
+
+        assertEquals(2, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        val links = body.select("a[href]").filter { EpubFootnoteLink.isFootnote(it.attr("href")) }
+        assertEquals("旧版批注内容", EpubFootnoteLink.decode(links[0].attr("href"))?.content)
+        assertEquals("旧版后置注释", EpubFootnoteLink.decode(links[1].attr("href"))?.content)
+    }
+
+    @Test
+    fun `semantic target supports unknown reference class and descendant id`() {
+        val body = body(
+            """
+            <h1>标题<a class="apnb" href="#note-1">*</a></h1>
+            <aside epub:type="footnote">
+              <p id="note-1"><a class="footnote-back" href="#title">*</a>目标语义确认的注释</p>
+            </aside>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "目标语义确认的注释",
+            EpubFootnoteLink.decode(body.selectFirst("a.apnb")!!.attr("href"))?.content
+        )
+        assertTrue(body.selectFirst("a.apnb")!!.parents().any { it.tagName() == "h1" })
+        assertTrue(body.selectFirst("a.apnb")!!.parents().any { it.tagName() == "usehtml" })
+    }
+
+    @Test
+    fun `asciidoctor footnote class is supported`() {
+        val body = body(
+            """
+            <p>正文<sup class="footnote">[<a class="footnote" id="_footnoteref_1"
+              href="#_footnotedef_1">1</a>]</sup></p>
+            <div id="footnotes"><div class="footnote" id="_footnotedef_1">
+              <a href="#_footnoteref_1">1. </a>Asciidoctor 注释
+            </div></div>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "Asciidoctor 注释",
+            EpubFootnoteLink.decode(body.selectFirst("a.footnote")!!.attr("href"))?.content
+        )
+    }
+
+    @Test
+    fun `epub2 child anchor target resolves to enclosing footnote`() {
+        val body = body(
+            """
+            <p>正文<a class="fnanchor" href="#fn-1">[1]</a></p>
+            <p class="fnote"><a id="fn-1" href="#ref-1">[1]</a> EPUB 2 子锚点注释</p>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "[1] EPUB 2 子锚点注释",
+            EpubFootnoteLink.decode(body.selectFirst("a.fnanchor")!!.attr("href"))?.content
+        )
+        assertTrue(body.select("p.fnote").isEmpty())
+    }
+
+    @Test
     fun `cross resource footnote resolves relative path`() {
         val body = body("<p>正文<a epub:type=\"noteref\" href=\"../notes/end.xhtml#n1\">*</a></p>")
         var requestedHref: String? = null
