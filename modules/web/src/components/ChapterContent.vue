@@ -13,12 +13,18 @@
       @error.once="proxyImage"
       loading="lazy"
     />
-    <p v-else :style="{ fontFamily, fontSize }" v-html="replaceImage(para)" @error.capture="handleImgLoadError" />
+    <p
+      v-else
+      :style="{ fontFamily, fontSize }"
+      v-html="replaceImage(para)"
+      @click="handleContentClick"
+      @error.capture="handleImgLoadError"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { isLegadoUrl, lazyRegex } from '@/utils/utils'
+import { isLegadoUrl, lazyRegex, parseEpubFootnoteUrl } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
 import type { webReadConfig } from '@/web'
@@ -110,6 +116,22 @@ const handleImgLoadError = (event: Event) => {
     )
     proxyImage(event)
   }
+}
+
+const handleContentClick = (event: MouseEvent) => {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const anchor = target.closest('a')
+  if (!(anchor instanceof HTMLAnchorElement)) return
+
+  const footnote = parseEpubFootnoteUrl(anchor.getAttribute('href') ?? '')
+  if (!footnote) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  ElMessageBox.alert(footnote.content, footnote.label || '注释', {
+    confirmButtonText: '确定',
+  })
 }
 
 const calculateWordCount = (paragraph: string) => {

@@ -12,6 +12,31 @@ export const isLegadoUrl = (/** @type {string} */ url: string) =>
     url.startsWith('blob:')
   )
 
+export type EpubFootnote = {
+  label: string
+  content: string
+}
+
+/** 解析 Android 阅读器内部使用的 EPUB 注释链接。 */
+export const parseEpubFootnoteUrl = (
+  href: string,
+): EpubFootnote | undefined => {
+  try {
+    const url = new URL(href)
+    if (url.protocol !== 'legado:' || url.hostname !== 'epub-note') {
+      return undefined
+    }
+    const content = url.searchParams.get('content')
+    if (!content?.trim()) return undefined
+    return {
+      label: url.searchParams.get('label') ?? '',
+      content,
+    }
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * 验证输入的URL是否符合阅读后端地址规则
  * @param allowedProtocols 允许的协议，默认`["https:", "http:"]`
