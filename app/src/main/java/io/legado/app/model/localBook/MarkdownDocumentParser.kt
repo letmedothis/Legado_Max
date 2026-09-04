@@ -99,8 +99,9 @@ internal object MarkdownDocumentParser {
         val html = renderer.render(parser.parse(markdown))
         val document = Jsoup.parseBodyFragment(html)
         document.outputSettings().prettyPrint(false)
-        makeTablesReadable(document.body())
         makeTaskItemsReadable(document.body())
+        makeOrderedListsReadable(document.body())
+        makeTablesReadable(document.body())
         sanitizeUrls(document.body())
         val compactHtml = document.body().html()
             .replace("\r", "")
@@ -192,17 +193,40 @@ internal object MarkdownDocumentParser {
         return Jsoup.parse(linksWithoutDestination).text().trim()
     }
 
-    /** Android 的 HtmlCompat 不支持表格布局，转换为等宽、逐行可读的文本表格。 */
+    /** Android 的 HtmlCompat 不支持表格布局，转换为保留单元格格式的逐行内容。 */
     private fun makeTablesReadable(body: Element) {
         body.select("table").forEach { table ->
-            val replacement = Element("p")
-            val code = replacement.appendElement("code")
+            val replacement = Element("div")
             val rows = table.select("tr")
             rows.forEachIndexed { index, row ->
-                code.appendText(row.select("th, td").joinToString(" | ") { it.text() })
-                if (index < rows.lastIndex) code.appendElement("br")
+                val cells = row.select("th, td")
+                if (cells.isEmpty()) return@forEachIndexed
+                val paragraph = replacement.appendElement("p")
+                cells.forEachIndexed { cellIndex, cell ->
+                    if (cellIndex > 0) paragraph.appendText(" | ")
+                    val content = cell.html().trim()
+                    if (row.select("th").isNotEmpty()) {
+                        paragraph.appendElement("b").html(content)
+                    } else {
+                        paragraph.append(content)
+                    }
+                }
+                if (index < rows.lastIndex && row.select("th").isNotEmpty()) {
+                    replacement.appendElement("p").text("---")
+                }
             }
             table.replaceWith(replacement)
+        }
+    }
+
+    /** HtmlCompat 会保留列表项文本，但不可靠地绘制 [ol] 的编号，直接写入编号保证可见。 */
+    private fun makeOrderedListsReadable(body: Element) {
+        body.select("ol").forEach { list ->
+            val depth = list.parents().count { it.tagName() == "ol" }
+            val indent = "　".repeat(depth)
+            list.children().filter { it.tagName() == "li" }.forEachIndexed { index, item ->
+                item.prependText("$indent${index + 1}. ")
+            }
         }
     }
 

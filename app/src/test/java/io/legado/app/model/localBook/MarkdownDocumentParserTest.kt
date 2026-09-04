@@ -78,6 +78,17 @@ class MarkdownDocumentParserTest {
     }
 
     @Test
+    fun `render keeps ordered list numbers including nested levels`() {
+        val rendered = MarkdownDocumentParser.render(
+            "1. first\n2. second\n   1. nested"
+        )
+
+        assertTrue(rendered.contains("1. first"))
+        assertTrue(rendered.contains("2. second"))
+        assertTrue(rendered.contains("1. nested"))
+    }
+
+    @Test
     fun `render supports tables and keeps code line breaks`() {
         val rendered = MarkdownDocumentParser.render(
             """
@@ -92,8 +103,9 @@ class MarkdownDocumentParserTest {
             """.trimIndent()
         )
 
-        assertTrue(rendered.contains("Name | Value"))
+        assertTrue(rendered.contains("<b>Name</b> | <b>Value</b>"))
         assertTrue(rendered.contains("one | two"))
+        assertFalse(rendered.contains("<code>"))
         assertTrue(rendered.contains("val one = 1&#10;val two = 2"))
     }
 
