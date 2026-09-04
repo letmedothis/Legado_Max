@@ -22,6 +22,7 @@ object IntentType {
             "m4a", "mp3", "mid", "xmf", "ogg", "wav" -> "video/*"
             "3gp", "mp4" -> "audio/*"
             "jpg", "gif", "png", "jpeg", "bmp" -> "image/*"
+            "md", "markdown" -> "text/markdown"
             "", "txt", "json", "log" -> "text/plain"
             "apk" -> "application/vnd.android.package-archive"
             else -> "*/*"

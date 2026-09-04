@@ -20,6 +20,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.getBookSource
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -259,7 +260,7 @@ class TextChapterLayout(
         for ((contentIndex, content) in processedContents.withIndex()) {
             currentCoroutineContext().ensureActive()
             val specialText = content.trim()
-            if (adaptSpecialStyle || EpubFootnoteLink.containsFootnote(specialText)) {
+            if (adaptSpecialStyle || book.isMarkdown || EpubFootnoteLink.containsFootnote(specialText)) {
                 if (adaptSpecialStyle && specialText == "[newpage]") {
                     prepareNextPageIfNeed()
                     continue
@@ -646,7 +647,7 @@ class TextChapterLayout(
         contents.forEachIndexed { contentIndex, content ->
             currentCoroutineContext().ensureActive()
             val specialText = content.trim()
-            if (adaptSpecialStyle || EpubFootnoteLink.containsFootnote(specialText)) {
+            if (adaptSpecialStyle || book.isMarkdown || EpubFootnoteLink.containsFootnote(specialText)) {
                 if (adaptSpecialStyle && specialText == "[newpage]") {
                     prepareNextPageIfNeed()
                     return@forEachIndexed

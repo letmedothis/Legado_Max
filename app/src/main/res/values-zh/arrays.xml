@@ -25,6 +25,8 @@
 
     <string-array name="text_suffix">
         <item>.txt</item>
+        <item>.md</item>
+        <item>.markdown</item>
         <item>.json</item>
         <item>.xml</item>
     </string-array>

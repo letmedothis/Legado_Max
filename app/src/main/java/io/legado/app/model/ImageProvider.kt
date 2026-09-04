@@ -14,10 +14,12 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isMobi
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.MobiFile
+import io.legado.app.model.localBook.MarkdownFile
 import io.legado.app.model.localBook.PdfFile
 import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.FileUtils
@@ -164,6 +166,10 @@ object ImageProvider {
                     book.isEpub -> EpubFile.getImage(book, src)
                     book.isPdf -> PdfFile.getImage(book, src)
                     book.isMobi -> MobiFile.getImage(book, src)
+                    book.isMarkdown -> MarkdownFile.getImage(book, src) ?: run {
+                        BookHelp.saveImage(bookSource, book, src)
+                        null
+                    }
                     else -> {
                         BookHelp.saveImage(bookSource, book, src)
                         null

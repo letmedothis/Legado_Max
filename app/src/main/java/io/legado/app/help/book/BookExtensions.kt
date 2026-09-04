@@ -56,6 +56,9 @@ val Book.isLocal: Boolean
 val Book.isLocalTxt: Boolean
     get() = isLocal && originName.endsWith(".txt", true)
 
+val Book.isMarkdown: Boolean
+    get() = isLocal && (originName.endsWith(".md", true) || originName.endsWith(".markdown", true))
+
 val Book.isEpub: Boolean
     get() = isLocal && originName.endsWith(".epub", true)
 

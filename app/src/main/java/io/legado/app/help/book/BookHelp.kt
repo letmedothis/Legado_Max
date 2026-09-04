@@ -350,7 +350,7 @@ object BookHelp {
 
     fun getChapterFiles(book: Book): HashSet<String> {
         val fileNames = hashSetOf<String>()
-        if (book.isLocalTxt) {
+        if (book.isLocalTxt || book.isMarkdown) {
             return fileNames
         }
         FileUtils.createFolderIfNotExist(
@@ -393,7 +393,7 @@ object BookHelp {
      * 检测该章节是否下载
      */
     fun hasContent(book: Book, bookChapter: BookChapter): Boolean {
-        return if (book.isLocalTxt ||
+        return if (book.isLocalTxt || book.isMarkdown ||
             (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title))
         ) {
             true

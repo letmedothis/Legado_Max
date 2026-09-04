@@ -160,7 +160,7 @@ class ContentProcessor private constructor(
             } catch (e: Exception) {
                 AppLog.put("去除重复标题出错\n${e.localizedMessage}", e)
             }
-            if (reSegment && book.getReSegment()) {
+            if (reSegment && book.getReSegment() && !book.isMarkdown) {
                 //重新分段
                 // 先保护 img 标签，避免被分段算法破坏引号和空格
                 val imgMap = mutableMapOf<String, String>()
@@ -191,7 +191,7 @@ class ContentProcessor private constructor(
                 }
             }
             val useHtmlMap = mutableMapOf<String, String>()
-            if (AppConfig.adaptSpecialStyle) { //html处理
+            if (AppConfig.adaptSpecialStyle || book.isMarkdown) { //html处理
                 mContent = AppPattern.useHtmlRegex.replace(mContent) { matchResult ->
                     val placeholder = "特殊格式的占位不应该被看见${useHtmlMap.size}。"
                     useHtmlMap[placeholder] = "\n${matchResult.value.replace("\n","")}\n"

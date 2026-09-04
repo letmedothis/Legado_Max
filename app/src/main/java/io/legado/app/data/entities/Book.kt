@@ -17,6 +17,7 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getFolderNameNoCache
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isImage
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -229,8 +230,8 @@ data class Book(
         if (useReplaceRule != null) {
             return useReplaceRule
         }
-        //图片类书源 epub本地 默认关闭净化
-        if (isImage || isEpub) {
+        //结构化内容默认关闭净化，避免替换规则破坏 HTML 标签和资源地址。
+        if (isImage || isEpub || isMarkdown) {
             return false
         }
         return AppConfig.replaceEnableDefault

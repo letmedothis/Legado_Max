@@ -548,6 +548,9 @@
                 <data android:scheme="file" />
                 <!-- text -->
                 <data android:mimeType="text/plain" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/md" />
                 <!-- json -->
                 <data android:mimeType="application/json" />
                 <!-- EPUB -->
@@ -581,6 +584,13 @@
                 <data android:pathAdvancedPattern=".*\\.[tT][xX][tT]" />
                 <data android:pathPattern=".*\\.txt" />
                 <data android:pathPattern=".*\\.TXT" />
+                <!-- Markdown -->
+                <data android:pathAdvancedPattern=".*\\.[mM][dD]" />
+                <data android:pathPattern=".*\\.md" />
+                <data android:pathPattern=".*\\.MD" />
+                <data android:pathAdvancedPattern=".*\\.[mM][aA][rR][kK][dD][oO][wW][nN]" />
+                <data android:pathPattern=".*\\.markdown" />
+                <data android:pathPattern=".*\\.MARKDOWN" />
                 <!--JSON-->
                 <data android:pathAdvancedPattern=".*\\.[jJ][sS][oO][nN]" />
                 <data android:pathPattern=".*\\.json" />

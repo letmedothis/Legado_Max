@@ -28,6 +28,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.globalExecutor
+import io.legado.app.model.localBook.MarkdownFile
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.model.webBook.LazyContentCallback
 import io.legado.app.model.webBook.LazyContentManager
@@ -150,6 +151,7 @@ object ReadBook : CoroutineScope by MainScope() {
         lastBookProgress = null
         webBookProgress = null
         TextFile.clear()
+        MarkdownFile.clear()
         synchronized(this) {
             loadingChapters.clear()
             downloadedChapters.clear()

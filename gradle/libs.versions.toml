@@ -30,6 +30,8 @@ turbine = "1.2.0"
 mockk = "1.13.12"
 liveeventbus = "1.8.14"
 markwon = "4.6.2"
+# Markwon 4.6.2 锁定 CommonMark 0.13.0；扩展必须保持同版本以避免 AST API 不兼容。
+commonmark = "0.13.0"
 material = "1.13.0"
 media = "1.7.1"
 danmaku = "0.9.25"
@@ -153,6 +155,8 @@ markwon-core = { module = "io.noties.markwon:core", version.ref = "markwon" }
 markwon-image-glide = { module = "io.noties.markwon:image-glide", version.ref = "markwon" }
 markwon-ext-tables = { module = "io.noties.markwon:ext-tables", version.ref = "markwon" }
 markwon-html = { module = "io.noties.markwon:html", version.ref = "markwon" }
+commonmark-gfm-strikethrough = { module = "com.atlassian.commonmark:commonmark-ext-gfm-strikethrough", version.ref = "commonmark" }
+commonmark-autolink = { module = "com.atlassian.commonmark:commonmark-ext-autolink", version.ref = "commonmark" }
 
 
 nanohttpd-nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanoHttpd" }

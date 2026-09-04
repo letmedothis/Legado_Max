@@ -377,6 +377,8 @@ dependencies {
     implementation(libs.markwon.image.glide)
     implementation(libs.markwon.ext.tables)
     implementation(libs.markwon.html)
+    implementation(libs.commonmark.gfm.strikethrough)
+    implementation(libs.commonmark.autolink)
     
     //转换繁体
     implementation(libs.quick.chinese.transfer.core)

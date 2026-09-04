@@ -28,6 +28,7 @@ import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isArchive
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isMobi
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isUmd
 import io.legado.app.help.book.removeLocalUriCache
@@ -119,6 +120,10 @@ object LocalBook {
     @Throws(TocEmptyException::class)
     fun getChapterList(book: Book): ArrayList<BookChapter> {
         val chapters = when {
+            book.isMarkdown -> {
+                MarkdownFile.getChapterList(book)
+            }
+
             book.isEpub -> {
                 EpubFile.getChapterList(book)
             }
@@ -172,6 +177,10 @@ object LocalBook {
     fun getContent(book: Book, chapter: BookChapter): String? {
         var content = try {
             when {
+                book.isMarkdown -> {
+                    MarkdownFile.getContent(book, chapter)
+                }
+
                 book.isEpub -> {
                     EpubFile.getContent(book, chapter)
                 }
@@ -273,6 +282,7 @@ object LocalBook {
 
     fun upBookInfo(book: Book) {
         when {
+            book.isMarkdown -> MarkdownFile.upBookInfo(book)
             book.isEpub -> EpubFile.upBookInfo(book)
             book.isUmd -> UmdFile.upBookInfo(book)
             book.isPdf -> PdfFile.upBookInfo(book)

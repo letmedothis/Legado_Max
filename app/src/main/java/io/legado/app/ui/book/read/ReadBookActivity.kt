@@ -42,6 +42,7 @@ import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalTxt
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.isMobi
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
@@ -68,6 +69,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJsonObject
 import io.legado.app.model.localBook.EpubFile
+import io.legado.app.model.localBook.MarkdownFile
 import io.legado.app.model.localBook.MobiFile
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.receiver.TimeBatteryReceiver
@@ -619,6 +621,9 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
                 if (it.isMobi) {
                     MobiFile.clear()
+                }
+                if (it.isMarkdown) {
+                    MarkdownFile.clear()
                 }
                 loadChapterList(it)
             }
@@ -1200,6 +1205,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 isAudio -> "音频"
                 isEpub -> "EPUB"
                 isMobi -> "MOBI"
+                isMarkdown -> "Markdown"
                 isLocalTxt -> "TXT"
                 isLocal -> getString(R.string.local)
                 else -> ""
