@@ -49,6 +49,10 @@ import io.legado.app.data.entities.DirectLinkUploadRule
 import io.legado.app.data.entities.UploadHistory
 import io.legado.app.data.entities.UploadHistoryWithRule
 import io.legado.app.ui.upload.DirectLinkUploadViewModel.*
+import io.legado.app.ui.theme.pageTopBarBackground
+import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
 import java.text.SimpleDateFormat
 import java.util.*
@@ -95,11 +99,12 @@ fun DirectLinkUploadScreen(
     val tabs = listOf("规则管理", "上传历史")
 
     // 主界面布局
-    Scaffold(
-        containerColor = Color.Transparent,
+    val topBarColors = pageTopBarColors()
+    AppScaffold(
         // 顶部应用栏
         topBar = {
             TopAppBar(
+                modifier = Modifier.pageTopBarBackground(topBarColors),
                 title = {
                     Text(
                         text = "直链上传配置",
@@ -108,11 +113,11 @@ fun DirectLinkUploadScreen(
                 },
                 // 顶部栏颜色配置
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    scrolledContainerColor = MaterialTheme.colorScheme.secondary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSecondary,
-                    titleContentColor = MaterialTheme.colorScheme.onSecondary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSecondary
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                    navigationIconContentColor = topBarColors.contentColor,
+                    titleContentColor = topBarColors.contentColor,
+                    actionIconContentColor = topBarColors.contentColor
                 ),
                 // 导航图标(返回按钮)
                 navigationIcon = {
@@ -423,7 +428,7 @@ fun RuleListTab(
         // 规则列表
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 8.dp)
+            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + navigationBarBottomInset)
         ) {
             items(rules) { rule ->
                 RuleCard(
@@ -599,7 +604,7 @@ fun HistoryListTab(
         // 历史记录列表
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 8.dp)
+            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp + navigationBarBottomInset)
         ) {
             items(histories) { historyWithRule ->
                 HistoryCard(

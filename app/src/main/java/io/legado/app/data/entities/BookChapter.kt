@@ -20,6 +20,7 @@ import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.replace
+import java.util.concurrent.ConcurrentHashMap
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.parcelize.IgnoredOnParcel
@@ -62,8 +63,8 @@ data class BookChapter(
     @delegate:Transient
     @delegate:Ignore
     @IgnoredOnParcel
-    override val variableMap: HashMap<String, String> by lazy {
-        GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
+    override val variableMap: ConcurrentHashMap<String, String> by lazy {
+        ConcurrentHashMap(GSON.fromJsonObject<Map<String, String>>(variable).getOrNull() ?: emptyMap())
     }
 
     fun putImgUrl(value: String?) {
@@ -72,15 +73,14 @@ data class BookChapter(
     }
 
     fun putLyric(value: String?) { //存入歌词文本
-        if (super.putVariable("lyric", value)) {
-            variable = GSON.toJson(variableMap)
+        // 走 putVariable 的同步协议，避免与并发的 chapter.putVariable 互相覆盖序列化结果
+        if (putVariable("lyric", value)) {
             update()
         }
     }
 
     fun putDanmaku(value: String?) { //存入弹幕文本
-        if (super.putVariable("danmaku", value)) {
-            variable = GSON.toJson(variableMap)
+        if (putVariable("danmaku", value)) {
             update()
         }
     }
@@ -94,8 +94,10 @@ data class BookChapter(
     var titleMD5: String? = null
 
     override fun putVariable(key: String, value: String?): Boolean {
-        if (super.putVariable(key, value)) {
-            variable = GSON.toJson(variableMap)
+        synchronized(variableMap) {
+            if (super.putVariable(key, value)) {
+                variable = GSON.toJson(variableMap)
+            }
         }
         return true
     }

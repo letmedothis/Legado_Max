@@ -56,7 +56,10 @@ import io.legado.app.ui.theme.pageAccentColor
 import io.legado.app.ui.theme.pageMutedIconTint
 import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.theme.pageSurfaceVariantColor
-import io.legado.app.ui.theme.pageTopBarContainerColor
+import io.legado.app.ui.theme.pageTopBarBackground
+import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.utils.sendToClip
 
 /**
@@ -82,8 +85,7 @@ fun CheckSourceScreen(
     var detailResult by remember { mutableStateOf<CheckResult?>(null) }
     var showSourcePicker by remember { mutableStateOf(false) }
     
-    Scaffold(
-        containerColor = Color.Transparent,
+    AppScaffold(
         topBar = {
             CheckSourceTopBar(
                 uiState = uiState,
@@ -407,7 +409,7 @@ fun CheckSourceTopBar(
     onClearClick: () -> Unit,
     onConfigClick: () -> Unit
 ) {
-    val containerColor = pageTopBarContainerColor()
+    val topBarColors = pageTopBarColors()
     val (titleText, subtitleText) = when (uiState) {
         is CheckSourceUIState.Idle -> "准备就绪" to "准备就绪"
         is CheckSourceUIState.Checking -> "检测中..." to "检测中..."
@@ -416,12 +418,13 @@ fun CheckSourceTopBar(
     }
 
     TopAppBar(
+        modifier = Modifier.pageTopBarBackground(topBarColors),
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = containerColor,
-            scrolledContainerColor = containerColor,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSecondary,
-            titleContentColor = MaterialTheme.colorScheme.onSecondary,
-            actionIconContentColor = MaterialTheme.colorScheme.onSecondary
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent,
+            navigationIconContentColor = topBarColors.contentColor,
+            titleContentColor = topBarColors.contentColor,
+            actionIconContentColor = topBarColors.contentColor
         ),
         title = {
             Column {
@@ -1015,7 +1018,7 @@ fun ResultList(
     ) {
         LazyColumn(
             modifier = modifier,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 8.dp + navigationBarBottomInset),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(

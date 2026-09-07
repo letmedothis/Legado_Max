@@ -2,6 +2,7 @@
 
 package io.legado.app.ui.main
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.graphics.Outline
@@ -30,9 +31,11 @@ import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst.appInfo
+import io.legado.app.constant.ClipboardImportMode
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityMainBinding
+import io.legado.app.databinding.DialogClipboardImportBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.LifecycleHelp
@@ -40,6 +43,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.NavigationBarConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
@@ -77,23 +81,24 @@ import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
-import io.legado.app.utils.startActivity
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.DevicePerformanceUtils
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.externalFiles
+import io.legado.app.utils.FileUtils
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.getPrefInt
+import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import splitties.views.bottomPadding
 import kotlin.coroutines.resume
-import androidx.core.view.get
 import androidx.core.graphics.drawable.toDrawable
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.ui.about.UpdateDialog
+import java.io.File
 import io.legado.app.utils.StringUtils
 import io.legado.app.utils.clearClip
 import io.legado.app.utils.getClipText
@@ -133,6 +138,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private var onUpBooksBadgeView: BadgeView? = null
     private var bottomNavigationConfigSignature: String? = null
     private var bottomNavigationInset = 0
+    /** 背景图签名缓存，配合 [currentBackgroundSignature] 避免每次 onResume 重复解码 */
+    private var backgroundImageSignature: String? = null
+    /** 背景是否至少应用过一次（区分“尚未初始化”与“签名匹配跳过”） */
+    private var backgroundImageApplied = false
 
     private fun bookshelfPosition(): Int = realPositions.indexOf(idBookshelf)
 
@@ -172,6 +181,13 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
      *   共享，不会因双份背景导致像素内存翻倍，仅额外占用一份轻量状态对象。
      */
     override fun upBackgroundImage() {
+        // 签名缓存：主题/背景路径/文件变更/模糊值均未变化时直接跳过，
+        // 避免每次从其它界面返回 onResume 时都在主线程重新解码整张壁纸并高斯模糊。
+        val signature = currentBackgroundSignature()
+        if (backgroundImageApplied && backgroundImageSignature == signature) {
+            return
+        }
+        backgroundImageSignature = signature
         super.upBackgroundImage()
         // 将 decorView 的当前背景同步到 content_container
         // 使用 constantState?.newDrawable()?.mutate() 创建独立副本，
@@ -179,6 +195,36 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         val decorBg = window.decorView.background
         // 注意：此处会无条件覆盖 content_container 背景，详见上方约束说明
         binding.contentContainer.background = decorBg?.constantState?.newDrawable()?.mutate()
+        backgroundImageApplied = true
+    }
+
+    /**
+     * 计算当前主题背景的签名，取图逻辑与 [ThemeConfig.getBgImage] 保持一致。
+     * 纳入主题模式（日/夜）、背景路径、文件最后修改时间与大小、模糊强度，
+     * 任一变化都会使签名不同而触发重新解码。
+     */
+    private fun currentBackgroundSignature(): String? {
+        val night = AppConfig.isNightTheme
+        val prefKey = if (night) PreferKey.bgImageN else PreferKey.bgImage
+        val rawPath = getPrefString(prefKey).orEmpty()
+        if (rawPath.isBlank()) return "bg:$prefKey:empty"
+        // 与 getBgImage 相同：在线背景需先落到缓存文件，仅文件名的需拼接完整路径
+        val path = if (rawPath.startsWith("http")) {
+            val filePath = FileUtils.getPath(externalFiles, prefKey, ThemeConfig.getUrlToFile(rawPath))
+            if (FileUtils.exist(filePath)) filePath else null
+        } else if (!rawPath.contains(File.separator)) {
+            val filePath = FileUtils.getPath(externalFiles, prefKey, rawPath)
+            if (FileUtils.exist(filePath)) filePath else null
+        } else {
+            rawPath
+        }
+        if (path == null) return "bg:$prefKey:missing:$rawPath"
+        val blurring = getPrefInt(
+            if (night) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring,
+            0
+        )
+        val file = File(path)
+        return "bg:$prefKey:${file.absolutePath}:${file.lastModified()}:${file.length()}:$blurring"
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -240,7 +286,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             binding.viewPagerMain.postDelayed(1000) {
                 viewModel.ruleSubsUp()
             }
-            readShibboleth(1500)
             //自动更新书籍
             val isAutoRefreshedBook = savedInstanceState?.getBoolean("isAutoRefreshedBook") ?: false
             if (AppConfig.autoRefreshBook && !isAutoRefreshedBook) {
@@ -457,10 +502,22 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         }
     }
 
+    /**
+     * App 已在前台时，外部应用通过 intent 跳入本界面（singleTask）只回调此处，
+     * 不经过 onStart，需显式标记为"从外部进入"，确保外部分享的口令能被识别。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        LifecycleHelp.markEnteredFromExternal()
+    }
+
     override fun onResume() {
         super.onResume()
-        // 口令识别：不限制 activitySize，确保从子 Activity 返回时也能识别
-        readShibboleth(500)
+        // 口令识别只在从 App 外部进入主界面时进行（冷启动、后台切回、外部应用跳入），
+        // 应用内子界面返回不再读取剪贴板，避免每次回到主界面都弹窗打扰。
+        if (LifecycleHelp.consumeEnteredFromExternal()) {
+            readShibboleth()
+        }
         // 用户从设置页返回时，RECREATE 事件可能未送达后台的 Activity，
         // 或 recreate() 可能被 upSort() 异常阻断。
         // 在 onResume 中直接刷新背景图片，确保主题背景变更立即生效。
@@ -478,13 +535,19 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     /**
      * 释放底栏玻璃视图的采样源，停止实时模糊采样以节省 CPU/GPU 资源。
-     * 在 Activity 不可见或销毁时调用；恢复可见时由 refreshBottomNavigationConfig 重新绑定。
+     * 在 Activity 不可见或销毁时调用。
+     *
+     * 注意：此处不能清空 [bottomNavigationConfigSignature] 配置签名缓存。
+     * 配置本身并未变化，若清空会导致每次从其它界面返回时都触发
+     * [applyNavigationBarPackage] 全量重建（自定义图标、布局、阴影、
+     * Fragment 底部内边距、LiquidGlass 重建等），正是“设置底栏图标后
+     * 回主界面卡顿”的来源。恢复可见时应由 [refreshBottomNavigationConfig]
+     * 在签名一致的分支调用 [restoreBottomNavigationSamplingIfNeeded]，
+     * 仅异步恢复采样源而跳过整包重建。
      */
     private fun releaseBottomNavigationGlassSampling() {
         if (!binding.bottomNavigationGlassView.isReleased()) {
             binding.bottomNavigationGlassView.release()
-            // 重置签名缓存，确保恢复时重新绑定采样源
-            bottomNavigationConfigSignature = null
         }
     }
 
@@ -740,10 +803,40 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private fun refreshBottomNavigationConfig(force: Boolean = false) {
         val signature = NavigationBarConfig.currentSignature(this, AppConfig.isNightTheme)
         if (!force && bottomNavigationConfigSignature == signature) {
+            // 配置未变化：仅恢复可能已被 onStop 释放的玻璃采样，跳过整包重建
+            restoreBottomNavigationSamplingIfNeeded()
             return
         }
         bottomNavigationConfigSignature = signature
         applyNavigationBarPackage()
+    }
+
+    /**
+     * 底栏配置未变化时，异步恢复被 onStop 释放的玻璃/磨砂采样源。
+     *
+     * 回到主界面时配置签名一致即可复用既有底栏（自定义图标、布局均未被破坏），
+     * 只需重新 [StableLiquidGlassView.bind] 采样源。使用 post 推迟到布局帧后
+     * 执行，避免在 onResume 同步重建采样造成首帧卡顿。
+     */
+    private fun restoreBottomNavigationSamplingIfNeeded() {
+        binding.run {
+            val glassView = bottomNavigationGlassView
+            if (!glassView.isReleased()) return@run
+            val config = NavigationBarConfig.activeConfig(this@MainActivity, AppConfig.isNightTheme)
+            val needsGlass = config.layoutMode != NavigationBarConfig.LAYOUT_STANDARD &&
+                config.effectMode != NavigationBarConfig.EFFECT_SOLID &&
+                DevicePerformanceUtils.supportsRealtimeGlass
+            if (!needsGlass) return@run
+            glassView.visible()
+            val bgColor = resolveNavigationBarBackground(config)
+            val cornerRadius = if (config.layoutMode == NavigationBarConfig.LAYOUT_FLOATING) 24f.dpToPx() else 0f
+            glassView.post {
+                if (isFinishing || isDestroyed) return@post
+                if (bottomNavigationGlassView.isReleased() && bottomNavigationGlassView.isAttachedToWindow) {
+                    setupBottomLiquidGlass(bottomNavigationGlassView, config, cornerRadius, bgColor)
+                }
+            }
+        }
     }
 
     /**
@@ -1192,35 +1285,89 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     /**
-     * 读取导入口令
+     * 读取剪贴板中的导入口令。
+     *
+     * 触发时机由 [onResume] 收敛为「从 App 外部进入主界面」，应用内子界面返回不再打扰用户。
+     *
+     * 采用先探测后询问：先在本地判断剪贴板是否真含 `#L:` 口令，确认有才继续，
+     * 否则静默返回。绝大多数情况下剪贴板内容与导入无关，这样可避免无谓弹窗。
+     * 前台读取剪贴板无需权限，探测过程也不联网、不落库。
+     *
+     * 探测到口令后的行为由设置项 [PreferKey.clipboardImportMode] 决定：
+     * - ASK：弹窗询问，可勾选「记住我的选择」把决定固化为 ALWAYS / NEVER
+     * - ALWAYS：直接导入并 Toast 提示
+     * - NEVER：不读取剪贴板
      */
-    fun readShibboleth(delay: Long) {
-        binding.viewPagerMain.postDelayed(delay) {
-            try {
-                val text = this@MainActivity.getClipText()
-                if (text.isNullOrBlank()) return@postDelayed
-                if ("#L:" in text) {
-                    this@MainActivity.clearClip() //清理一下防重复
-                    val (url, type, customWord) = StringUtils.unShibboleth(text)
-                    when (type) {
-                        StringUtils.BOOK_SOURCE ->
-                            showDialogFragment(ImportBookSourceDialog(url))
-                        StringUtils.RSS_SOURCE ->
-                            showDialogFragment(ImportRssSourceDialog(url))
-                        StringUtils.DICT_RULE ->
-                            showDialogFragment(ImportDictRuleDialog(url))
-                        StringUtils.REPLACE_RULE ->
-                            showDialogFragment(ImportReplaceRuleDialog(url))
-                        StringUtils.TOC_RULE ->
-                            showDialogFragment(ImportTxtTocRuleDialog(url))
-                        StringUtils.TTS_RULE ->
-                            showDialogFragment(ImportHttpTtsDialog(url))
-                        else -> showDialogFragment(ImportHttpTtsDialog(url))
-                    }
-                }
+    private fun readShibboleth() {
+        binding.viewPagerMain.postDelayed(500) {
+            val mode = AppConfig.clipboardImportMode
+            if (mode == ClipboardImportMode.NEVER) return@postDelayed
+            val text = try {
+                this@MainActivity.getClipText()
             } catch (e: Exception) {
                 e.printOnDebug()
+                null
             }
+            if (text.isNullOrBlank() || "#L:" !in text) return@postDelayed
+            if (mode == ClipboardImportMode.ALWAYS) {
+                // 自动导入是用户「记住此选择」后的静默行为，导入对话框会毫无预兆地弹出，
+                // 用 Toast 说明来源，避免用户困惑于这个框从哪来
+                toastOnUi(R.string.clipboard_import_auto_toast)
+                importShibboleth(text)
+            } else {
+                showClipboardImportConfirm(text)
+            }
+        }
+    }
+
+    /**
+     * 询问是否导入剪贴板中探测到的口令。
+     *
+     * 勾选「记住我的选择」后把本次决定写入 [PreferKey.clipboardImportMode] 长期生效；
+     * 未勾选则只对本次生效。
+     */
+    private fun showClipboardImportConfirm(text: String) {
+        val dialogBinding = DialogClipboardImportBinding.inflate(layoutInflater)
+        alert(R.string.clipboard_import_confirm, R.string.clipboard_import_confirm_summary) {
+            customView { dialogBinding.root }
+            okButton {
+                if (dialogBinding.cbRemember.isChecked) {
+                    AppConfig.clipboardImportMode = ClipboardImportMode.ALWAYS
+                }
+                importShibboleth(text)
+            }
+            cancelButton {
+                if (dialogBinding.cbRemember.isChecked) {
+                    AppConfig.clipboardImportMode = ClipboardImportMode.NEVER
+                }
+            }
+        }
+    }
+
+    /**
+     * 解析剪贴板中的 #L: 导入口令并弹出对应的导入对话框
+     */
+    private fun importShibboleth(text: String) {
+        try {
+            this@MainActivity.clearClip() //清理一下防重复
+            val (url, type, customWord) = StringUtils.unShibboleth(text)
+            when (type) {
+                StringUtils.BOOK_SOURCE ->
+                    showDialogFragment(ImportBookSourceDialog(url))
+                StringUtils.RSS_SOURCE ->
+                    showDialogFragment(ImportRssSourceDialog(url))
+                StringUtils.DICT_RULE ->
+                    showDialogFragment(ImportDictRuleDialog(url))
+                StringUtils.REPLACE_RULE ->
+                    showDialogFragment(ImportReplaceRuleDialog(url))
+                StringUtils.TOC_RULE ->
+                    showDialogFragment(ImportTxtTocRuleDialog(url))
+                StringUtils.TTS_RULE ->
+                    showDialogFragment(ImportHttpTtsDialog(url))
+                else -> showDialogFragment(ImportHttpTtsDialog(url))
+            }
+        } catch (e: Exception) {
+            e.printOnDebug()
         }
     }
 
