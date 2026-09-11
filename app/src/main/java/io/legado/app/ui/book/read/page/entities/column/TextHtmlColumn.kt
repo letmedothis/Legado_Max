@@ -12,6 +12,7 @@ import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.book.read.page.provider.HighlightFontCache
 
 /**
  * 带html样式的文字列
@@ -33,6 +34,7 @@ data class TextHtmlColumn(
     override val bgImage: String = "",
     override val bgImageFit: Int = 0,
     override val bgImageScale: Float = 1f,
+    override val fontPath: String = "",
 ) : TextBaseColumn {
 
     override val textColor: Int? get() = mTextColor
@@ -75,6 +77,12 @@ data class TextHtmlColumn(
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
         val y = textLine.lineBase - textLine.lineTop
+        // 高亮规则指定字体时替换画笔字体（保留原字重/斜体）；textPaint 为列私有拷贝，无需还原
+        if (fontPath.isNotEmpty()) {
+            HighlightFontCache.getTypefaceFor(fontPath, textPaint.typeface)?.let {
+                textPaint.typeface = it
+            }
+        }
         if (linkUrl != null) {
             textPaint.run {
                 color = ReadBookConfig.textAccentColor

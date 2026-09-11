@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read.page.provider
 
 import android.graphics.Paint
 import android.text.Layout
+import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.StaticLayout
@@ -114,6 +115,9 @@ class TextChapterLayout(
 
     private val contentPaint = ChapterProvider.contentPaint
     private val reviewCharWidth by lazy { contentPaint.measureText(srcReplaceStr) * 1.5556f }
+
+    // 高亮规则字体测宽专用画笔，参数在每次使用前按当前排版画笔设置
+    private val highlightFontPaint = TextPaint().apply { isAntiAlias = true }
     private val contentPaintTextHeight = ChapterProvider.contentPaintTextHeight
     private val contentPaintFontMetrics = ChapterProvider.contentPaintFontMetrics
 
@@ -1015,10 +1019,15 @@ class TextChapterLayout(
                 val bgImage = highlightStyle?.bgImage ?: ""
                 val bgImageFit = highlightStyle?.bgImageFit ?: 0
                 val bgImageScale = highlightStyle?.bgImageScale ?: 1f
+                val highlightFontPath = extractFontPath(spanned, charIndex)
                 val charRight = if (charIndex + 1 < lineEnd) {
                     staticLayout.getPrimaryHorizontal(charIndex + 1)
                 } else {
                     tempPaint.textSize = textSize
+                    // 行尾字符无下一列可取坐标，需按该字符实际字体测宽，保持与绘制一致
+                    tempPaint.typeface = HighlightFontCache.getTypefaceFor(
+                        highlightFontPath, textPaint.typeface
+                    ) ?: textPaint.typeface
                     val charWidth = tempPaint.measureText(char)
                     charX + charWidth
                 }
@@ -1137,7 +1146,8 @@ class TextChapterLayout(
                                 bgColor = bgColor,
                                 bgImage = bgImage,
                                 bgImageFit = bgImageFit,
-                                bgImageScale = bgImageScale
+                                bgImageScale = bgImageScale,
+                                fontPath = highlightFontPath
                             )
                         )
                         needAddText = false
@@ -1157,7 +1167,8 @@ class TextChapterLayout(
                             bgColor = bgColor,
                             bgImage = bgImage,
                             bgImageFit = bgImageFit,
-                            bgImageScale = bgImageScale
+                            bgImageScale = bgImageScale,
+                            fontPath = highlightFontPath
                         )
                     )
                 }
@@ -1281,6 +1292,68 @@ class TextChapterLayout(
     private fun extractTextColor(spanned: Spanned, index: Int): Int? {
         val foregroundSpans = spanned.getSpans(index, index + 1, ForegroundColorSpan::class.java)
         return foregroundSpans.lastOrNull()?.foregroundColor
+    }
+
+    private fun extractFontPath(spanned: Spanned, index: Int): String {
+        val spans = spanned.getSpans(index, index + 1, HighlightTypefaceSpan::class.java)
+        return spans.lastOrNull()?.fontPath.orEmpty()
+    }
+
+    /**
+     * 高亮规则指定字体时，按高亮字体重新测量对应字符宽度，
+     * 保证排版宽度与最终绘制一致。
+     */
+    private fun adjustWidthsForHighlightFont(
+        text: String,
+        widthsArray: FloatArray,
+        charStyles: Array<CharStyle?>?,
+        textPaint: TextPaint,
+    ) {
+        if (charStyles == null) return
+        for (i in text.indices) {
+            val fontPath = charStyles[i]?.font
+            if (fontPath.isNullOrEmpty()) continue
+            // 原 width 为 0 的下标属于代理对/组合字符簇的延续，重测会破坏聚类
+            if (widthsArray[i] <= 0f) continue
+            val typeface = HighlightFontCache.getTypefaceFor(fontPath, textPaint.typeface) ?: continue
+            highlightFontPaint.textSize = textPaint.textSize
+            highlightFontPaint.letterSpacing = textPaint.letterSpacing
+            highlightFontPaint.textScaleX = textPaint.textScaleX
+            highlightFontPaint.textSkewX = textPaint.textSkewX
+            highlightFontPaint.typeface = typeface
+            widthsArray[i] = highlightFontPaint.measureText(text, i, i + 1)
+        }
+    }
+
+    /**
+     * 存在高亮字体时，把命中区间包成带 HighlightTypefaceSpan 的 SpannableString，
+     * 让 StaticLayout 断行测量与逐字符列宽使用同一套字体，避免行宽错位。
+     */
+    private fun buildFontAwareLayoutText(
+        text: String,
+        charStyles: Array<CharStyle?>?,
+    ): CharSequence {
+        if (charStyles == null) return text
+        var spanStart = -1
+        var spanFont = ""
+        var spannable: SpannableString? = null
+        for (i in 0..text.length) {
+            val font = if (i < text.length) charStyles[i]?.font.orEmpty() else ""
+            if (font != spanFont) {
+                if (spanFont.isNotEmpty() && spanStart in 0 until i) {
+                    val sb = spannable ?: SpannableString(text).also { spannable = it }
+                    sb.setSpan(
+                        HighlightTypefaceSpan(spanFont),
+                        spanStart,
+                        i,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+                spanStart = i
+                spanFont = font
+            }
+        }
+        return spannable ?: text
     }
 
     private fun extractHighlightStyle(spanned: CharSequence, index: Int): HighlightStyleSpan? {
@@ -1438,6 +1511,15 @@ class TextChapterLayout(
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
+        if (style.font.isNotBlank()) {
+            // 字体属于影响测量的样式，StaticLayout 排版需要 MetricAffectingSpan
+            spannable.setSpan(
+                HighlightTypefaceSpan(style.font),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
         if (style.hasDecoration) {
             spannable.setSpan(
                 HighlightStyleSpan(style),
@@ -1473,6 +1555,7 @@ class TextChapterLayout(
         }
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
+        adjustWidthsForHighlightFont(text, widthsArray, charStyles, textPaint)
         // 调整气泡内联宽度
         if (srcList != null && srcList.isNotEmpty()) {
             var imageIndex = 0
@@ -1491,7 +1574,15 @@ class TextChapterLayout(
             val indentSize = if (isFirstLine) paragraphIndent.length else 0
             ZhLayout(text, textPaint, visibleWidth, words, widths, indentSize)
         } else {
-            StaticLayout(text, textPaint, visibleWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
+            StaticLayout(
+                buildFontAwareLayoutText(text, charStyles),
+                textPaint,
+                visibleWidth,
+                Layout.Alignment.ALIGN_NORMAL,
+                0f,
+                0f,
+                true
+            )
         }
         durY = when {
             //标题y轴居中
@@ -1815,6 +1906,7 @@ class TextChapterLayout(
         val bgImage = style?.bgImage ?: ""
         val bgImageFit = style?.bgImageFit ?: 0
         val bgImageScale = style?.bgImageScale ?: 1f
+        val fontPath = style?.font.orEmpty()
         val column = when {
             !srcList.isNullOrEmpty() && (char == srcReplaceStr || char == reviewStr) -> {
                 val src = srcList.removeFirst()
@@ -1854,7 +1946,8 @@ class TextChapterLayout(
                     bgColor = bgColor,
                     bgImage = bgImage,
                     bgImageFit = bgImageFit,
-                    bgImageScale = bgImageScale
+                    bgImageScale = bgImageScale,
+                    fontPath = fontPath
                 )
             }
         }
@@ -1976,6 +2069,7 @@ class TextChapterLayout(
                 bgImage = style.bgImage,
                 bgImageFit = style.bgImageFit,
                 bgImageScale = style.bgImageScale,
+                font = style.font,
             )
         }
     }

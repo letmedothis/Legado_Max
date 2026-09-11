@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import com.google.android.flexbox.FlexboxLayout
@@ -12,6 +13,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.dao.BookShelfDisplay
 import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bookBorderBackground
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -27,6 +29,11 @@ class BooksAdapterList(
     private val callBack: CallBack,
     private val lifecycle: Lifecycle
 ) : BaseBooksAdapter<ItemBookshelfListBinding>(context) {
+
+    private companion object {
+        /** 未读轨道色：主题强调色约 25% 透明度 */
+        const val TRACK_ALPHA = 64
+    }
 
     override fun getViewBinding(parent: ViewGroup): ItemBookshelfListBinding {
         return ItemBookshelfListBinding.inflate(inflater, parent, false)
@@ -65,6 +72,7 @@ class BooksAdapterList(
             ivCover.load(item, false)
             upRefresh(binding, item)
             upLastUpdateTime(binding, item)
+            upReadProgress(binding, item)
             // 显示简介和标签（仅在列表视图启用"显示更多信息"时）
             upMoreInfo(binding, item)
         } else {
@@ -77,7 +85,10 @@ class BooksAdapterList(
                         "dur" -> tvRead.text = item.durChapterTitle
                         "last" -> tvLast.text = item.latestChapterTitle
                         "cover" -> ivCover.load(item, false, fragment, lifecycle)
-                        "refresh" -> upRefresh(binding, item)
+                        "refresh" -> {
+                            upRefresh(binding, item)
+                            upReadProgress(binding, item)
+                        }
                         "lastUpdateTime" -> upLastUpdateTime(binding, item)
                         "moreInfo" -> upMoreInfo(binding, item)
                     }
@@ -112,6 +123,24 @@ class BooksAdapterList(
         }
     }
 
+    private fun upReadProgress(binding: ItemBookshelfListBinding, item: BookShelfDisplay) {
+        val progress = if (AppConfig.showBookshelfReadProgress) item.readProgress() else null
+        if (progress == null) {
+            binding.pbReadProgress.gone()
+            binding.tvReadPercent.gone()
+        } else {
+            // 未读轨道跟随主题强调色（半透明），避免默认轨道色与主题色脱节
+            binding.pbReadProgress.setIndicatorColor(binding.pbReadProgress.context.accentColor)
+            binding.pbReadProgress.setTrackColor(
+                ColorUtils.setAlphaComponent(binding.pbReadProgress.context.accentColor, TRACK_ALPHA)
+            )
+            binding.pbReadProgress.visible()
+            binding.pbReadProgress.progress = (progress * 100).toInt()
+            binding.tvReadPercent.visible()
+            binding.tvReadPercent.text = "${(progress * 100).toInt()}%"
+        }
+    }
+
     /** 更新简介和标签的显示状态 */
     private fun upMoreInfo(binding: ItemBookshelfListBinding, item: BookShelfDisplay) {
         // 显示标签（使用 FlexboxLayout，每个标签有外框）
@@ -142,8 +171,8 @@ class BooksAdapterList(
             flexboxLayout.addView(wordCountTag)
         }
 
-        // 后显示分类标签
-        val tagsText = item.customTag ?: item.kind ?: ""
+        // 后显示分类标签（只显示书源分类信息，书籍标签仅用于书架标签栏，不在此处展示）
+        val tagsText = item.kind ?: ""
         if (tagsText.isNotBlank()) {
             val tags = tagsText.splitNotBlank(",", "\n")
             for (tag in tags) {

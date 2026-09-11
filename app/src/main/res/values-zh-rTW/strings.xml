@@ -378,7 +378,8 @@
     <string name="local_book">本機書籍</string>
     <string name="status_bar_immersion">狀態欄顏色透明</string>
     <string name="imm_navigation_bar">沉浸式導航欄</string>
-    <string name="imm_navigation_bar_s">頂欄顏色透明</string>
+    <string name="imm_navigation_bar_s">導航欄顏色透明</string>
+    <string name="top_bar_transparent">頂欄顏色透明</string>
     <string name="top_bar_transparent_hint">關閉後會顯示頂欄陰影，開啟則消失</string>
     <string name="add_to_bookshelf">放入書架</string>
     <string name="add_to_favorites">加入收藏</string>
@@ -638,6 +639,8 @@
     <string name="add_replace_rule">建立取代</string>
     <string name="group">分組</string>
     <string name="group_s">分組：%s</string>
+    <string name="book_tag_s">標籤：%s</string>
+    <string name="book_tag_existing">已有標籤</string>
     <string name="toc_s">目錄：%s</string>
     <string name="enable_explore">啟用發現</string>
     <string name="disable_explore">禁用發現</string>
@@ -737,6 +740,7 @@
     <string name="save_image">儲存圖片</string>
     <string name="no_default_path">沒有預設路徑</string>
     <string name="change_group">設定分組</string>
+    <string name="set_book_tag">設定標籤</string>
     <string name="view_toc">查看目錄</string>
     <string name="bar_elevation">導航欄陰影</string>
     <string name="bar_elevation_s">目前陰影大小(elevation)：%s</string>
@@ -1387,6 +1391,7 @@
     <string name="book_author_other_works_error">搜尋失敗: %1$s</string>
     <string name="immersion_nav_bar">沉浸式操作列</string>
     <string name="show_author_other_works_in_book_info">顯示作者其他作品</string>
+    <string name="show_book_tag_in_book_info">顯示設定標籤</string>
     <string name="key_page_anim_speed_title">按鍵翻頁動畫速度</string>
     <string name="manga_disable_page_anim">停用漫畫翻頁動畫</string>
     <string name="manga_epaper_stting">電子紙螢幕設定</string>
@@ -1639,6 +1644,7 @@
     <!-- 列表視圖顯示更多資訊 -->
     <string name="show_more_info">顯示更多資訊</string>
     <string name="show_intro">顯示簡介</string>
+    <string name="show_bookshelf_read_progress">顯示閱讀進度</string>
     <string name="show_category_info">顯示分類資訊等</string>
     <string name="show_book_border">顯示外邊框</string>
     <!-- 簡介行數選擇 -->
@@ -1822,6 +1828,7 @@
     <string name="application_theme_import_with_options">导入应用主题设置</string>
     <string name="application_theme_import_options_hint">勾選需要在匯入時建立的元件，未勾選的元件將被跳過（不建立）</string>
     <string name="application_theme_delete_options_hint">刪除「%1$s」時，勾選要一併刪除的關聯元件，未勾選的元件將被保留</string>
+    <string name="application_theme_builtin_name">預設主題</string>
     <string name="application_theme_manage">应用主题</string>
     <string name="application_theme_name">应用主题名称</string>
     <string name="application_theme_name_exists">应用主题名称已存在</string>

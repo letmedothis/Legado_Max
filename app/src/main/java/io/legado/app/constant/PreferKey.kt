@@ -67,6 +67,8 @@ object PreferKey {
     const val showMoreInfoInList = "showMoreInfoInList"
     const val showIntroInList = "showIntroInList"
     const val showCategoryInfoInList = "showCategoryInfoInList"
+    // 书架显示阅读进度开关
+    const val showBookshelfReadProgress = "showBookshelfReadProgress"
     // 书籍外边框开关（仅在列表/紧凑列表视图时生效）
     const val showBookBorder = "showBookBorder"
     // 简介显示行数（1-4行）
@@ -281,6 +283,7 @@ object PreferKey {
     const val readRecordDisplayMode = "readRecordDisplayMode"
     const val bookInfoShowReadRecord = "bookInfoShowReadRecord"
     const val bookInfoShowAuthorOtherWorks = "bookInfoShowAuthorOtherWorks"
+    const val bookInfoShowBookTag = "bookInfoShowBookTag"
     const val highlightRuleDialog = "highlightRuleDialog"
     const val highlightRuleBookTitle = "highlightRuleBookTitle"
     const val highlightRuleBracketNote = "highlightRuleBracketNote"

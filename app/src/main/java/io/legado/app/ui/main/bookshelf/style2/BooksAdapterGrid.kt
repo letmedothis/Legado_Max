@@ -3,7 +3,9 @@ package io.legado.app.ui.main.bookshelf.style2
 import android.content.Context
 import android.os.Bundle
 import android.view.ViewGroup
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfGrid2Binding
@@ -12,7 +14,9 @@ import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
 import io.legado.app.databinding.ItemBookshelfListGroupBinding
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.readProgress
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
@@ -22,6 +26,19 @@ import splitties.views.onLongClick
 class BooksAdapterGrid(context: Context, callBack: CallBack) :
     BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
     private val showBookname = AppConfig.showBookname
+
+    private fun updateReadProgress(pb: LinearProgressIndicator, item: Book) {
+        val progress = if (AppConfig.showBookshelfReadProgress) item.readProgress() else null
+        if (progress == null) {
+            pb.gone()
+        } else {
+            // 未读轨道跟随主题强调色（半透明），避免默认轨道色与主题色脱节
+            pb.setIndicatorColor(pb.context.accentColor)
+            pb.setTrackColor(ColorUtils.setAlphaComponent(pb.context.accentColor, 64))
+            pb.visible()
+            pb.progress = (progress * 100).toInt()
+        }
+    }
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -93,6 +110,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             }
             ivCover.load(item, false)
             upRefresh(this, item)
+            updateReadProgress(binding.pbReadProgress, item)
         }
 
         fun onBind(item: Book, position: Int, payloads: MutableList<Any>) = binding.run {
@@ -109,7 +127,10 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                                 false
                             )
 
-                            "refresh" -> upRefresh(this, item)
+                            "refresh" -> {
+                                upRefresh(this, item)
+                                updateReadProgress(binding.pbReadProgress, item)
+                            }
                         }
                     }
                 }
@@ -149,6 +170,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             tvName.text = item.name
             ivCover.load(item, false)
             upRefresh(this, item)
+            updateReadProgress(binding.pbReadProgress, item)
         }
 
         fun onBind(item: Book, position: Int, payloads: MutableList<Any>) = binding.run {
@@ -165,7 +187,10 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                                 false
                             )
 
-                            "refresh" -> upRefresh(this, item)
+                            "refresh" -> {
+                                upRefresh(this, item)
+                                updateReadProgress(binding.pbReadProgress, item)
+                            }
                         }
                     }
                 }

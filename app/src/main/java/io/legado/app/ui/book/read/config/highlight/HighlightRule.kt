@@ -18,6 +18,8 @@ data class HighlightRule(
     var underlineWidth: Float = 1f,
     var underlineOffset: Float = 2f,
     var underlineSvgPath: String? = null,
+    /** 高亮字体路径（FileDoc 字符串），为空时跟随阅读字体 */
+    var font: String? = null,
     var bgColor: Int? = null,
     var bgImage: String? = null,
     var bgImageFit: Int = 0,
@@ -65,6 +67,9 @@ data class HighlightRule(
                 } + underlineColor?.let { " ${it.toHexColor()}" }.orEmpty()
             )
         }
+        if (!font.isNullOrBlank()) {
+            parts.add("字体 ${fontDisplayName()}")
+        }
         if (!bgImage.isNullOrBlank()) {
             parts.add(
                 when (bgImageFit) {
@@ -80,6 +85,19 @@ data class HighlightRule(
             parts.add("无样式")
         }
         return parts.joinToString(" / ")
+    }
+
+    /**
+     * 从字体路径中提取展示用的文件名。
+     * content:// 形式的 FileDoc 路径经过 URL 编码（如 %20），展示前需解码。
+     */
+    fun fontDisplayName(): String {
+        val fontPath = font ?: return ""
+        if (fontPath.isBlank()) return ""
+        val decoded = runCatching {
+            java.net.URLDecoder.decode(fontPath, "utf-8")
+        }.getOrNull() ?: fontPath
+        return decoded.substringAfterLast('/').substringAfterLast('\\').ifBlank { fontPath }
     }
 
     fun targetScopeLabel(): String {

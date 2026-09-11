@@ -31,6 +31,8 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.font.FontSelectDialog
+import io.legado.app.utils.showDialogFragment
 
 /**
  * 高亮规则单条编辑弹窗。
@@ -43,7 +45,8 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
     private val defaultGroup: String? = null,
     private val defaultScope: String? = null,
     private val onSave: (HighlightRule) -> Unit = {},
-) : BaseDialogFragment(R.layout.dialog_highlight_rule_edit, true), ColorPickerDialogListener {
+) : BaseDialogFragment(R.layout.dialog_highlight_rule_edit, true), ColorPickerDialogListener,
+    FontSelectDialog.CallBack {
 
     private val binding by viewBinding(DialogHighlightRuleEditBinding::bind)
     private val viewModel: HighlightRuleEditViewModel by viewModels()
@@ -281,6 +284,9 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.etBgImage.setTextColor(primaryTextColor)
         binding.etBgImage.setHintTextColor(secondaryTextColor)
         binding.tvBgImagePick.setTextColor(primaryTextColor)
+        binding.etFont.setTextColor(primaryTextColor)
+        binding.etFont.setHintTextColor(secondaryTextColor)
+        binding.tvFontPick.setTextColor(primaryTextColor)
         binding.etSampleText.setTextColor(primaryTextColor)
         binding.etSampleText.setHintTextColor(secondaryTextColor)
         binding.etScope.setTextColor(primaryTextColor)
@@ -313,6 +319,8 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.tvPreview.background = previewBg
         binding.etBgImage.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
         binding.tvBgImagePick.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
+        binding.etFont.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
+        binding.tvFontPick.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
         binding.etSampleText.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
         binding.etScope.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
         binding.etExcludeScope.background = makeInputDrawable(inputBgColor, inputStrokeColor, 14f, density)
@@ -415,6 +423,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         } else {
             binding.etBgImage.setText("")
         }
+        updateFontText()
         binding.etSampleText.setText(editingRule.sampleText.ifBlank { editingRule.normalizedSampleText() })
         binding.spBgImageFit.setSelection(editingRule.bgImageFit.coerceIn(0, 2))
         binding.sbBgImageScale.progress = (editingRule.bgImageScale.coerceIn(0.1f, 5f) * 10).toInt()
@@ -539,6 +548,16 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         }
         binding.tvBgImagePick.setOnClickListener {
             showBgImagePicker()
+        }
+        binding.etFont.setOnClickListener {
+            showDialogFragment<FontSelectDialog> {
+                putBoolean(FontSelectDialog.ARG_FOR_RULE, true)
+            }
+        }
+        binding.tvFontPick.setOnClickListener {
+            showDialogFragment<FontSelectDialog> {
+                putBoolean(FontSelectDialog.ARG_FOR_RULE, true)
+            }
         }
         binding.spBgImageFit.onItemSelectedListener =
             object : android.widget.AdapterView.OnItemSelectedListener {
@@ -670,6 +689,29 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         }
     }
 
+    /**
+     * 更新字体输入框显示，只展示字体文件名，路径本体保存在规则里
+     */
+    private fun updateFontText() {
+        val fontPath = editingRule.font
+        binding.etFont.setText(
+            if (fontPath.isNullOrBlank()) {
+                ""
+            } else {
+                editingRule.fontDisplayName()
+            }
+        )
+    }
+
+    override val curFontPath: String
+        get() = editingRule.font.orEmpty()
+
+    override fun selectFont(path: String) {
+        editingRule.font = path.takeIf { it.isNotBlank() }
+        updateFontText()
+        updatePreview()
+    }
+
     private fun updateRegexToggle() {
         binding.tvRegexToggle.text = getString(
             if (isRegexMode) {
@@ -715,6 +757,11 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         // 如果有背景图片，显示图片预览
         val bgImage = editingRule.bgImage.orEmpty()
         if (bgImage.isNotBlank()) {
+            // 点九图优先以 NinePatchDrawable 预览，保证拉伸效果与正文渲染一致
+            HighlightRuleBackgroundManager.getNinePatchDrawable(bgImage)?.let {
+                binding.viewBgImagePreview.background = it
+                return
+            }
             val bitmap = HighlightRuleBackgroundManager.getBitmap(bgImage)
             if (bitmap != null) {
                 val drawable = android.graphics.drawable.BitmapDrawable(resources, bitmap)
@@ -800,6 +847,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
             underlineWidth = binding.etUnderlineWidth.text?.toString()?.toFloatOrNull()?.coerceIn(0.1f, 10f) ?: 1f,
             underlineOffset = binding.etUnderlineOffset.text?.toString()?.toFloatOrNull()?.coerceIn(0f, 20f) ?: 2f,
             underlineSvgPath = binding.etSvgPath.text?.toString().orEmpty().takeIf { binding.spUnderlineMode.selectedItemPosition == 5 }.orEmpty(),
+            font = editingRule.font?.takeIf { it.isNotBlank() },
             // 背景：判断输入的是颜色值还是图片路径
             bgColor = parseColorOrNull(binding.etBgImage.text?.toString().orEmpty()),
             bgImage = binding.etBgImage.text?.toString().orEmpty().takeIf { it.isNotBlank() && parseColorOrNull(it) == null },
@@ -849,7 +897,8 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                 bgColor = parseColorOrNull(binding.etBgImage.text?.toString().orEmpty()),
                 bgImage = binding.etBgImage.text?.toString().orEmpty().takeIf { it.isNotBlank() && parseColorOrNull(it) == null },
                 bgImageFit = binding.spBgImageFit.selectedItemPosition,
-                bgImageScale = (binding.sbBgImageScale.progress.coerceAtLeast(1) / 10f).coerceIn(0.1f, 5f)
+                bgImageScale = (binding.sbBgImageScale.progress.coerceAtLeast(1) / 10f).coerceIn(0.1f, 5f),
+                font = editingRule.font?.takeIf { it.isNotBlank() },
             )
         )
     }
