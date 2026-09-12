@@ -211,6 +211,12 @@ interface ReadRecordDao {
         source: String? = null
     ): ReadRecordSession?
 
+    @Query("SELECT DISTINCT deviceId, bookName, bookAuthor, source FROM readRecordSession")
+    suspend fun getDistinctSessionIdentities(): List<SessionIdentity>
+
+    @Query("DELETE FROM readRecordSession WHERE id IN (:ids)")
+    suspend fun deleteSessionsByIds(ids: List<Long>)
+
     @Query("DELETE FROM readRecordSession WHERE deviceId = :deviceId AND bookName = :bookName AND bookAuthor = :bookAuthor AND (:source IS NULL OR source = :source)")
     suspend fun deleteSessionsByBook(deviceId: String, bookName: String, bookAuthor: String, source: String? = null)
 
@@ -356,4 +362,12 @@ data class DailyReadStat(
     val date: String,
     val readCount: Int,
     val totalReadTime: Long
+)
+
+/** 会话表中按设备、书籍与阅读来源去重后的标识。 */
+data class SessionIdentity(
+    val deviceId: String,
+    val bookName: String,
+    val bookAuthor: String,
+    val source: String,
 )

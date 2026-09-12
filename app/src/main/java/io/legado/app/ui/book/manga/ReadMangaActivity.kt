@@ -380,7 +380,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onPause() {
         super.onPause()
-        ReadManga.upReadTime()
+        ReadManga.flushReadTime()
         if (ReadManga.inBookshelf) {
             ReadManga.saveRead()
             if (!BuildConfig.DEBUG) {

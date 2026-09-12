@@ -32,6 +32,8 @@ import io.legado.app.ui.theme.setLegadoContent
  */
 abstract class BaseComposeActivity : AppCompatActivity() {
 
+    private var recreateRequested = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 必须在 super.onCreate 之前调用 setTheme()
         initLegadoComposeTheme()
@@ -41,6 +43,19 @@ abstract class BaseComposeActivity : AppCompatActivity() {
         setLegadoContent(overlayAlpha = composeOverlayAlpha()) {
             ComposeContent()
         }
+    }
+
+    /**
+     * 合并同一实例周期内的多次重建请求。
+     *
+     * 一次配置变更（应用主题/顶栏/底栏等）可能同时被 AppCompat 模式切换、事件总线、
+     * onConfigurationChanged 等多路触发，竞态双重建会在部分 ROM 上破坏窗口/输入状态
+     * （见 docs/archive/主题列表应用主题后UI卡死根因分析.md）。重建完成前只放行一次。
+     */
+    override fun recreate() {
+        if (recreateRequested || isFinishing || isDestroyed) return
+        recreateRequested = true
+        super.recreate()
     }
 
     /**

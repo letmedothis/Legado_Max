@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Card
@@ -21,14 +20,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -41,8 +37,7 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.FragmentManager
 import io.legado.app.R
 import io.legado.app.base.BaseComposeActivity
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.share
@@ -77,27 +72,11 @@ private fun AboutScreen(
     onShareClick: () -> Unit,
     onScoringClick: () -> Unit
 ) {
-    val topBarColors = pageTopBarColors()
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = { Text(text = stringResource(R.string.about)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back)
-                        )
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.about),
+                onBackClick = onBackClick,
                 actions = {
                     IconButton(onClick = onShareClick) {
                         Icon(

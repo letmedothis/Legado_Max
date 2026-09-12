@@ -17,9 +17,7 @@ class RuleData : RuleDataInterface {
         }
     }
 
-    override fun getBigVariable(key: String): String? {
-        return null
-    }
+    override fun getBigVariable(key: String): String? = null
 
     fun getVariable(): String? {
         if (variableMap.isEmpty()) {
@@ -27,5 +25,4 @@ class RuleData : RuleDataInterface {
         }
         return GSON.toJson(variableMap)
     }
-
 }

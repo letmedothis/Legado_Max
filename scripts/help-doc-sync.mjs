@@ -7,10 +7,13 @@
  * 用法（由 .husky/pre-commit 调用，无需手动执行）：
  *   SKIP_DOC_SYNC=1 git commit ...        # 跳过本次检查
  *
+ * CI 自检（校验 map.json 本身是否还有效，供 .github/workflows/lint.yaml 调用）：
+ *   node scripts/help-doc-sync.mjs --verify
+ *
  * 退出码：0 通过 / 1 拦截（同时阻止 commit）
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import url from 'node:url';
@@ -77,6 +80,59 @@ function getStagedFiles() {
     // diff 失败（如无暂存变更）时返回空
     return [];
   }
+}
+
+// ---------- --verify 模式（CI 用）：校验 map.json 是否仍然有效 ----------
+// 逐条 rule 检查：source glob 必须在仓库命中 ≥1 个真实文件；docs 相对路径必须真实存在。
+function verify() {
+  console.log('[help-doc-sync:verify] 开始自检映射表（map.json）...');
+  const rules = loadMap();
+
+  let tracked = [];
+  try {
+    const out = execFileSync('git', ['ls-files'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    tracked = out
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch (e) {
+    console.error('[help-doc-sync:verify] ⚠ git ls-files 失败，source 命中校验跳过。');
+  }
+
+  let failed = 0;
+  for (const rule of rules) {
+    const matched = tracked.filter((f) => rule.sourceRe.test(f));
+    if (matched.length === 0) {
+      console.error(
+        `[help-doc-sync:verify] ❌ source 未命中任何跟踪文件：${rule.source}`
+      );
+      failed++;
+    }
+    for (const doc of rule.docs) {
+      if (!existsSync(doc)) {
+        console.error(
+          `[help-doc-sync:verify] ❌ 文档不存在：${toPosix(
+            path.relative(repoRoot, doc)
+          )}（来自 source ${rule.source}）`
+        );
+        failed++;
+      }
+    }
+  }
+
+  if (failed > 0) {
+    console.error(`[help-doc-sync:verify] ❌ 共发现 ${failed} 处映射异常，请修 map.json。`);
+    return 1;
+  }
+  const docCount = rules.reduce((n, r) => n + r.docs.length, 0);
+  console.log(
+    `[help-doc-sync:verify] ✅ 自检通过：${rules.length} 条 rule（合计 ${docCount} 个文档引用）均有效。`
+  );
+  return 0;
 }
 
 // ---------- 主逻辑 ----------
@@ -167,4 +223,8 @@ function main() {
   return 1;
 }
 
+const args = process.argv.slice(2);
+if (args.includes('--verify')) {
+  process.exit(verify());
+}
 process.exit(main());

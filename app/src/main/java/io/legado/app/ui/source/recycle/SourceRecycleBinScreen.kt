@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SourceRecycleBinScreen(
     viewModel: SourceRecycleBinViewModel,

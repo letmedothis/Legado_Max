@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Http
 import androidx.compose.material.icons.filled.Schedule
@@ -19,16 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.legado.app.R
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 
@@ -85,36 +81,12 @@ fun DebugToolsScreen(
         )
     )
 
-    val topBarColors = pageTopBarColors()
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.debug_tools),
-                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                        )
-                        Text(
-                            text = stringResource(R.string.debug_tools_desc),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
+            AppPageTopBar(
+                title = stringResource(R.string.debug_tools),
+                subtitle = stringResource(R.string.debug_tools_desc),
+                onBackClick = onBackClick
             )
         }
     ) { paddingValues ->

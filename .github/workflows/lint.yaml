@@ -20,7 +20,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          # 0 = 拉全量历史：spotless ratchetFrom 与 commitlint --from 需要比较基线
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -42,8 +43,41 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      - name: Setup Node (commitlint)
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Install JS deps (commitlint)
+        # commitlint 依赖在 package-lock.json 里，CI 无本地 node_modules，需先安装
+        run: npm ci --ignore-scripts
+
+      - name: Check Commit Messages
+        # 校验本次提交是否符合 Conventional Commits（本地 commit-msg 钩子的 CI 兜底）
+        run: |
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            npx --no -- commitlint --from origin/main --to HEAD
+          else
+            echo "origin/main 不存在，跳过 commitlint 校验"
+          fi
+
       - name: Run Compile Check
         run: |
           chmod +x gradlew
           # 只执行编译源码任务，不打包，最快速度验证 Kotlin 语法和依赖情况
           ./gradlew compileDebugSources --parallel --daemon --warning-mode all
+
+      - name: Kotlin Format Check (spotless/ktlint)
+        # 可选检查：格式问题不阻塞 CI，仅警示；本地修正 ./gradlew spotlessApply
+        continue-on-error: true
+        run: |
+          ./gradlew spotlessCheck --parallel --daemon --warning-mode all
+
+      - name: Android Lint
+        # 主线 flavor 单变体，避免全矩阵 lint 拖慢 CI
+        run: |
+          ./gradlew :app:lintAppMaxDebug --daemon --warning-mode all
+
+      - name: Help Doc Map Verify
+        # 校验 docs/help-doc-sync/map.json 的映射仍有效（本地 pre-commit 的 CI 兜底）
+        run: |
+          node scripts/help-doc-sync.mjs --verify

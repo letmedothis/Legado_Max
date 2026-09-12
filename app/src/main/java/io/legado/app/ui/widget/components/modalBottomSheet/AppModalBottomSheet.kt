@@ -36,7 +36,7 @@ fun AppModalBottomSheet(
     skipPartiallyExpanded: Boolean = true,
     startAction: (@Composable () -> Unit)? = null,
     endAction: (@Composable () -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded)
     val scrollState = rememberScrollState()
@@ -53,7 +53,7 @@ fun AppModalBottomSheet(
             // 导致内容顶 padding → sheet 高度 → Expanded 锚点(fullHeight-sheetHeight) 联动。
             // 当内容高度接近满屏时形成正反馈，滑动内层列表时整个弹窗持续上下抖动；
             // 去掉 Top 侧即可切断该反馈回路。
-            contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) }
+            contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom) },
         ) {
             // 顶部用不受消耗链影响的静态状态栏高度补偿（asPaddingValues 不扣除
             // consumeWindowInsets 传入的 offset），满屏时标题不会顶到状态栏下
@@ -65,11 +65,11 @@ fun AppModalBottomSheet(
                     .padding(top = statusBarTop)
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 16.dp)
-                    .verticalScroll(scrollState)
+                    .verticalScroll(scrollState),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     startAction?.invoke()
 
@@ -77,7 +77,7 @@ fun AppModalBottomSheet(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
 
                     endAction?.invoke()

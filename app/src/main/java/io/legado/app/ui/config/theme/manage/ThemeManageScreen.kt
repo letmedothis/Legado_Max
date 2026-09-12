@@ -2,9 +2,13 @@ package io.legado.app.ui.config.theme.manage
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -22,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
@@ -42,6 +47,8 @@ import io.legado.app.ui.config.widget.ImportFromClipboardAction
 import io.legado.app.ui.config.widget.MultiSelectAction
 import io.legado.app.ui.config.widget.SelectAllAction
 import io.legado.app.ui.config.widget.rememberConfigManageState
+import io.legado.app.ui.widget.components.AppSearchBar
+import io.legado.app.ui.widget.components.VerticalScrollbar
 
 @Composable
 fun ThemeManageScreen(
@@ -60,12 +67,17 @@ fun ThemeManageScreen(
 ) {
     val initialTab = if (AppConfig.isNightTheme) ConfigTab.NIGHT else ConfigTab.DAY
     val state = rememberConfigManageState(initialTab)
+    var searchQuery by remember { mutableStateOf("") }
     val allItems by viewModel.items.collectAsState()
     val editDraft by viewModel.editDraft.collectAsState()
     val appliedThemeTemplate = stringResource(R.string.applied_theme_config)
     val themeSummary = stringResource(R.string.theme_summary)
-    val dayItems = remember(allItems) { allItems.filter { !it.config.isNightTheme } }
-    val nightItems = remember(allItems) { allItems.filter { it.config.isNightTheme } }
+    val dayItems = remember(allItems, searchQuery) {
+        allItems.filter { !it.config.isNightTheme && it.config.themeName.contains(searchQuery.trim(), ignoreCase = true) }
+    }
+    val nightItems = remember(allItems, searchQuery) {
+        allItems.filter { it.config.isNightTheme && it.config.themeName.contains(searchQuery.trim(), ignoreCase = true) }
+    }
     val visibleItems = if (state.tab == ConfigTab.DAY) dayItems else nightItems
     val visibleKeys = remember(visibleItems) { visibleItems.map { it.key } }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -146,13 +158,22 @@ fun ThemeManageScreen(
             }
         }
     ) { contentPadding ->
-        DayNightPager(
-            state = state,
-            onTabChange = state::switchTab,
-            summaryText = themeSummary,
-            scrollEnabled = !state.isMultiSelectMode,
-            contentPadding = contentPadding,
-            dayContent = {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+        ) {
+            AppSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                hint = stringResource(R.string.search)
+            )
+            DayNightPager(
+                state = state,
+                onTabChange = state::switchTab,
+                summaryText = themeSummary,
+                scrollEnabled = !state.isMultiSelectMode,
+                dayContent = {
                 ThemeList(
                     items = dayItems,
                     state = state,
@@ -187,6 +208,7 @@ fun ThemeManageScreen(
                 )
             }
         )
+        }
     }
 
     if (state.editDialog.visible && editDraft != null) {
@@ -269,24 +291,32 @@ private fun ThemeList(
     onLongClick: (ThemeItem) -> Unit,
     onToggleSelect: (ThemeItem) -> Unit
 ) {
-    ConfigList(
-        items = items,
-        itemKey = { it.key },
-        itemContent = { item ->
-            ThemeCard(
-                item = item,
-                isMultiSelectMode = state.isMultiSelectMode,
-                isSelected = item.key in state.multiSelect.selectedKeys,
-                isCurrent = item.config.themeName == currentConfig.themeName &&
-                    item.config.isNightTheme == currentConfig.isNightTheme,
-                onApply = { onApply(item) },
-                onEdit = { onEdit(item) },
-                onShare = { onShare(item) },
-                onDelete = { onDelete(item) },
-                onCopy = { onCopy(item) },
-                onLongClick = { onLongClick(item) },
-                onToggleSelect = { onToggleSelect(item) }
-            )
-        }
-    )
+    val listState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        ConfigList(
+            items = items,
+            listState = listState,
+            itemKey = { it.key },
+            itemContent = { item ->
+                ThemeCard(
+                    item = item,
+                    isMultiSelectMode = state.isMultiSelectMode,
+                    isSelected = item.key in state.multiSelect.selectedKeys,
+                    isCurrent = item.config.themeName == currentConfig.themeName &&
+                        item.config.isNightTheme == currentConfig.isNightTheme,
+                    onApply = { onApply(item) },
+                    onEdit = { onEdit(item) },
+                    onShare = { onShare(item) },
+                    onDelete = { onDelete(item) },
+                    onCopy = { onCopy(item) },
+                    onLongClick = { onLongClick(item) },
+                    onToggleSelect = { onToggleSelect(item) }
+                )
+            }
+        )
+        VerticalScrollbar(
+            state = listState,
+            modifier = Modifier.align(Alignment.CenterEnd)
+        )
+    }
 }

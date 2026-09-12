@@ -111,7 +111,8 @@ import androidx.core.graphics.createBitmap
 /**
  * rss阅读界面
  */
-class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>(),
+class ReadRssActivity :
+    VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>(),
     RssFavoritesDialog.Callback {
 
     override val binding by viewBinding(ActivityRssReadBinding::inflate)
@@ -257,7 +258,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     private val editSourceResult = registerForActivityResult(
-        StartActivityContract(RssSourceEditActivity::class.java)
+        StartActivityContract(RssSourceEditActivity::class.java),
     ) {
         if (it.resultCode == RESULT_OK) {
             refresh()
@@ -283,7 +284,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     performSearch(query)
                 }
                 true
-            } else false
+            } else {
+                false
+            }
         }
         binding.btnFindPrev.setOnClickListener {
             if (findTotalCount > 0) navigateHighlight(findCurrentIndex - 2)
@@ -297,12 +300,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 hideFindBar()
                 return@addCallback
             }
-            if (binding.customWebView.size > 0) { //关闭全屏
+            if (binding.customWebView.size > 0) { // 关闭全屏
                 customWebViewCallback?.onCustomViewHidden()
                 return@addCallback
             }
             if (currentWebView.canGoBack()) {
-                val list = currentWebView.copyBackForwardList() //获取历史列表
+                val list = currentWebView.copyBackForwardList() // 获取历史列表
                 val size = list.size
                 if (size == 1) {
                     finish()
@@ -312,7 +315,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 val currentItem = list.currentItem
                 val currentUrl = currentItem?.originalUrl ?: BLANK_HTML
                 val currentTitle = currentItem?.title
-                //从后往前找，找到第一个不同链接的页面，计算需要回退多少步 避免刷新后导致返回不灵
+                // 从后往前找，找到第一个不同链接的页面，计算需要回退多少步 避免刷新后导致返回不灵
                 var steps = 1
                 for (i in currentIndex - 1 downTo 0) {
                     val item = list.getItemAtIndex(i)
@@ -464,19 +467,20 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private fun initWebView() {
         binding.progressBar.fontColor = accentColor
         currentWebView.webChromeClient = CustomWebChromeClient()
-        //添加屏幕方向控制，网页关闭，openUI
+        // 添加屏幕方向控制，网页关闭，openUI
         currentWebView.addJavascriptInterface(JSInterface(this), nameBasic)
         currentWebView.webViewClient = CustomWebViewClient()
         currentWebView.setOnLongClickListener {
             val hitTestResult = currentWebView.hitTestResult
             if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
-                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+            ) {
                 hitTestResult.extra?.let { webPic ->
                     selector(
                         arrayListOf(
                             SelectItem(getString(R.string.action_save), "save"),
-                            SelectItem(getString(R.string.select_folder), "selectFolder")
-                        )
+                            SelectItem(getString(R.string.select_folder), "selectFolder"),
+                        ),
                     ) { _, charSequence, _ ->
                         when (charSequence.value) {
                             "save" -> saveImage(webPic)
@@ -541,7 +545,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
                 val baseUrl = if (rssSource?.loadWithBaseUrl == false) null else url
                 currentWebView.loadDataWithBaseURL(
-                    baseUrl, html, "text/html", "utf-8", url
+                    baseUrl,
+                    html,
+                    "text/html",
+                    "utf-8",
+                    url,
                 )
             }
         }
@@ -567,7 +575,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 initJavascriptInterface()
                 val baseUrl = if (it.loadWithBaseUrl) it.sourceUrl else null
                 currentWebView.loadDataWithBaseURL(
-                    baseUrl, html, "text/html", "utf-8", it.sourceUrl
+                    baseUrl,
+                    html,
+                    "text/html",
+                    "utf-8",
+                    it.sourceUrl,
                 )
             }
         }
@@ -662,7 +674,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             currentWebView.evaluateJavascript("document.documentElement.outerHTML") {
                 val html = StringEscapeUtils.unescapeJson(it).replace("^\"|\"$".toRegex(), "")
                 viewModel.readAloud(
-                    Jsoup.parse(html).textArray().joinToString("\n")
+                    Jsoup.parse(html).textArray().joinToString("\n"),
                 )
             }
         }
@@ -690,10 +702,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         super.onDestroy()
     }
 
-
     @Suppress("unused")
     private class JSInterface(activity: ReadRssActivity) {
         private val activityRef: WeakReference<ReadRssActivity> = WeakReference(activity)
+
         @JavascriptInterface
         fun lockOrientation(orientation: String) {
             val ctx = activityRef.get()
@@ -702,9 +714,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     ctx.requestedOrientation = when (orientation) {
                         "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                        "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏且受重力控制正反
-                        "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE //正向横屏
-                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE //反向横屏
+                        "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE // 横屏且受重力控制正反
+                        "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE // 正向横屏
+                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE // 反向横屏
                         "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
@@ -724,9 +736,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     inner class CustomWebChromeClient : WebChromeClient() {
-        override fun getDefaultVideoPoster(): Bitmap {
-            return super.getDefaultVideoPoster() ?: createBitmap(100, 100)
-        }
+        override fun getDefaultVideoPoster(): Bitmap = super.getDefaultVideoPoster() ?: createBitmap(100, 100)
 
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
             super.onProgressChanged(view, newProgress)
@@ -766,8 +776,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 if (source.showWebLog) {
                     val messageLevel = consoleMessage.messageLevel().name
                     val message = consoleMessage.message()
-                    AppLog.put("${source.getTag()}${messageLevel}: $message",
-                        NoStackTraceException("\n${message}\n- Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}"))
+                    AppLog.put(
+                        "${source.getTag()}$messageLevel: $message",
+                        NoStackTraceException("\n${message}\n- Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}"),
+                    )
                     return true
                 }
             }
@@ -778,27 +790,24 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     inner class CustomWebViewClient : WebViewClient() {
 
         override fun shouldOverrideUrlLoading(
-            view: WebView, request: WebResourceRequest
-        ): Boolean {
-            return shouldOverrideUrlLoading(request.url)
-        }
+            view: WebView,
+            request: WebResourceRequest,
+        ): Boolean = shouldOverrideUrlLoading(request.url)
 
         @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION", "KotlinRedundantDiagnosticSuppress")
-        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-            return shouldOverrideUrlLoading(url.toUri())
-        }
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = shouldOverrideUrlLoading(url.toUri())
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             if (needClearHistory) {
                 needClearHistory = false
-                currentWebView.clearHistory() //清除历史
+                currentWebView.clearHistory() // 清除历史
             }
             super.onPageStarted(view, url, favicon)
             currentWebView.evaluateJavascript(basicJs, null)
         }
 
         private var jsInjected = false
-        
+
         /**
          * * 如果有黑名单,黑名单匹配返回空白,
          * 没有黑名单再判断白名单,在白名单中的才通过,
@@ -811,11 +820,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
          * 5. 其他请求 → 放行
          */
         override fun shouldInterceptRequest(
-            view: WebView, request: WebResourceRequest
+            view: WebView,
+            request: WebResourceRequest,
         ): WebResourceResponse? {
             val url = request.url.toString()
             val source = viewModel.rssSource ?: return super.shouldInterceptRequest(view, request)
-            
+
             // 1. 主框架请求 + 有预注入JS：通过OkHttp下载并注入JS
             if (request.isForMainFrame) {
                 if (viewModel.hasPreloadJs) {
@@ -829,7 +839,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
-            } 
+            }
             // 2. JS注入请求：返回预注入的JS代码
             else if (!jsInjected && url == nameUrl) {
                 jsInjected = true
@@ -839,10 +849,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 return WebResourceResponse(
                     "text/javascript",
                     "utf-8",
-                    ByteArrayInputStream(injectionContent.toByteArray())
+                    ByteArrayInputStream(injectionContent.toByteArray()),
                 )
             }
-            
+
             // 3. 黑名单检查：匹配则返回空白资源
             val blacklist = source.contentBlacklist?.splitNotBlank(",")
             if (!blacklist.isNullOrEmpty()) {
@@ -876,13 +886,13 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
         /**
          * 通过OkHttp下载HTML并注入预注入JS脚本
-         * 
+         *
          * 流程：
          * 1. 通过OkHttp下载网页内容
          * 2. 解析HTML，找到<head>标签
          * 3. 在<head>标签后插入JS脚本标签（JS_URL）
          * 4. WebView加载时会拦截这个JS请求，返回预注入的JS代码
-         * 
+         *
          * @param url 网页URL
          * @param request 原始请求
          * @return 修改后的HTML响应
@@ -901,19 +911,19 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         addHeader(key, value)
                     }
                 }
-                
+
                 // 保存Set-Cookie
                 res.headers("Set-Cookie").forEach { setCookie ->
                     webCookieManager.setCookie(url, setCookie)
                 }
-                
+
                 // 解析响应内容
                 val body = res.body
                 val contentType = body.contentType()
                 val mimeType = contentType?.toString()?.substringBefore(";") ?: "text/html"
                 val charset = contentType?.charset() ?: Charsets.UTF_8
                 val charsetSre = charset.name()
-                
+
                 // 在HTML的<head>标签后插入JS脚本标签
                 val bodyText = body.text().let { originalText ->
                     val headIndex = originalText.indexOf("<head", ignoreCase = true)
@@ -930,11 +940,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         originalText
                     }
                 }
-                
+
                 return WebResourceResponse(
                     mimeType,
                     charsetSre,
-                    ByteArrayInputStream(bodyText.toByteArray(charset))
+                    ByteArrayInputStream(bodyText.toByteArray(charset)),
                 )
             } catch (_: Exception) {
                 return null
@@ -956,11 +966,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
             // 更新标题栏
             view.title?.let { title ->
-                if (title != url
-                    && title != view.url
-                    && title.isNotBlank()
-                    && url != BLANK_HTML
-                    && !url.contains(title)) {
+                if (title != url &&
+                    title != view.url &&
+                    title.isNotBlank() &&
+                    url != BLANK_HTML &&
+                    !url.contains(title)
+                ) {
                     binding.titleBar.title = title
                 } else {
                     binding.titleBar.title = viewModel.upTitleData.value
@@ -975,7 +986,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             // 仅对视频类型(type==2)的订阅源生效，网页类型(type==0)不受静音播放设置控制
             if (VideoPlay.mutePlay && viewModel.rssSource?.type == 2) {
                 view.evaluateJavascript(
-                    "(function(){return document.querySelectorAll('video,audio').length;})()"
+                    "(function(){return document.querySelectorAll('video,audio').length;})()",
                 ) { result ->
                     val mediaCount = result.toIntOrNull() ?: 0
                     if (mediaCount > 0 && !mutePlayToastShown) {
@@ -1002,11 +1013,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             }
         }
 
-        private fun createEmptyResource(): WebResourceResponse {
-            return WebResourceResponse(
-                "text/plain", "utf-8", ByteArrayInputStream("".toByteArray())
-            )
-        }
+        private fun createEmptyResource(): WebResourceResponse = WebResourceResponse(
+            "text/plain",
+            "utf-8",
+            ByteArrayInputStream("".toByteArray()),
+        )
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {
             viewModel.rssSource?.let { source ->
@@ -1031,30 +1042,29 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return handleCommonSchemes(url)
         }
 
-        private fun handleCommonSchemes(url: Uri): Boolean {
-            return when (url.scheme) {
-                "http", "https" -> false
-                "legado", "yuedu" -> {
-                    startActivity<OnLineImportActivity> { data = url }
-                    true
-                }
+        private fun handleCommonSchemes(url: Uri): Boolean = when (url.scheme) {
+            "http", "https" -> false
+            "legado", "yuedu" -> {
+                startActivity<OnLineImportActivity> { data = url }
+                true
+            }
 
-                else -> {
-                    binding.root.longSnackbar(R.string.jump_to_another_app, R.string.confirm) {
-                        openUrl(url)
-                    }
-                    true
+            else -> {
+                binding.root.longSnackbar(R.string.jump_to_another_app, R.string.confirm) {
+                    openUrl(url)
                 }
+                true
             }
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")
         override fun onReceivedSslError(
-            view: WebView?, handler: SslErrorHandler?, error: SslError?
+            view: WebView?,
+            handler: SslErrorHandler?,
+            error: SslError?,
         ) {
             handler?.proceed()
         }
-
     }
 
     companion object {
@@ -1079,11 +1089,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 putExtra("title", title)
                 putExtra("link", link)
                 putExtra("sort", sort)
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP) //栈顶复用
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP) // 栈顶复用
             }
         }
 
         private val webCookieManager by lazy { android.webkit.CookieManager.getInstance() }
     }
-
 }

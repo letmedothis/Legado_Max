@@ -3,7 +3,10 @@ package io.legado.app.help.config
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.util.DisplayMetrics
+import android.util.LruCache
 import androidx.annotation.Keep
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.graphics.toColorInt
@@ -62,21 +65,41 @@ object ThemeConfig {
 
     private var needClearImg = true
 
+/** RECREATE 广播防抖窗口：一次应用主题产生的多路重建触发合并为一次通知 */
+    private const val recreateNotifyDelay = 1500L
+
+    private val recreateHandler = Handler(Looper.getMainLooper())
+
+    private val notifyRecreateRunnable = Runnable {
+        postEvent(EventBus.RECREATE, "")
+    }
+
+    /**
+     * 发送 RECREATE 重建事件（尾沿防抖）。
+     *
+     * `applyDayNight` 内部 `setDefaultNightMode` 会触发配置变化回调，回调链路里也会申请重建；
+     * 高频直发会形成「重建风暴」（一次点击多次广播 + 多窗口并发重建）。
+     * 这里在静默窗口内合并多路触发，窗口结束后只发一次；期间若出现新的真实操作，窗口顺延，
+     * 保证最后一次操作总是生效（不会被窗口期吞掉）。
+     */
+    fun notifyRecreate() {
+        recreateHandler.removeCallbacks(notifyRecreateRunnable)
+        recreateHandler.postDelayed(notifyRecreateRunnable, recreateNotifyDelay)
+    }
+
     fun getTheme() = when {
         AppConfig.isEInkMode -> Theme.EInk
         AppConfig.isNightTheme -> Theme.Dark
         else -> Theme.Light
     }
 
-    fun isDarkTheme(): Boolean {
-        return getTheme() == Theme.Dark
-    }
+    fun isDarkTheme(): Boolean = getTheme() == Theme.Dark
 
     fun applyDayNight(context: Context) {
         applyTheme(context)
         initNightMode()
         BookCover.upDefaultCover()
-        postEvent(EventBus.RECREATE, "")
+        notifyRecreate()
     }
 
     fun applyDayNightInit(context: Context) {
@@ -113,7 +136,7 @@ object ThemeConfig {
         val preferenceKey = when (themeMode) {
             Theme.Light -> PreferKey.bgImage
             Theme.Dark -> PreferKey.bgImageN
-            else -> return  null
+            else -> return null
         }
         var path = context.getPrefString(preferenceKey)
         if (path.isNullOrBlank()) return null
@@ -154,6 +177,59 @@ object ThemeConfig {
         }
         return bgImage?.stackBlur(bgImgBlu)?.toDrawable(context.resources)
     }
+
+    // ==================== 背景图进程级缓存（消除重建时的纯色闪烁） ====================
+
+    /** 背景图签名 → 解码结果缓存。整屏 ARGB 位图约 10MB/张，最多保留 2 张（当前 + 上一张切换占位） */
+    private val bgDrawableCache = object : LruCache<String, Drawable>(2) {}
+
+    /** 最近一次成功解码的背景图（签名 + Drawable），未命中缓存时用作解码期间的占位 */
+    @Volatile
+    private var lastBgImage: Pair<String, Drawable>? = null
+
+    /**
+     * 计算当前主题背景的签名，取图逻辑与 [getBgImage] 保持一致。
+     * 纳入主题模式（日/夜）、背景路径、文件最后修改时间与大小、模糊强度，
+     * 任一变化都会使签名不同而触发重新解码。无背景图配置时返回非空标识（缓存键仍有效）。
+     */
+    fun getBackgroundSignature(context: Context): String {
+        val night = AppConfig.isNightTheme
+        val prefKey = if (night) PreferKey.bgImageN else PreferKey.bgImage
+        val rawPath = context.getPrefString(prefKey).orEmpty()
+        if (rawPath.isBlank()) return "bg:$prefKey:empty"
+        // 与 getBgImage 相同：在线背景需先落到缓存文件，仅文件名的需拼接完整路径
+        val path = if (rawPath.startsWith("http")) {
+            val filePath = FileUtils.getPath(context.externalFiles, prefKey, getUrlToFile(rawPath))
+            filePath.takeIf { FileUtils.exist(it) }
+        } else if (!rawPath.contains(File.separator)) {
+            val filePath = FileUtils.getPath(context.externalFiles, prefKey, rawPath)
+            filePath.takeIf { FileUtils.exist(it) }
+        } else {
+            rawPath
+        }
+        if (path == null) return "bg:$prefKey:missing:$rawPath"
+        val blurring = context.getPrefInt(
+            if (night) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring,
+            0,
+        )
+        val file = File(path)
+        return "bg:$prefKey:${file.absolutePath}:${file.lastModified()}:${file.length()}:$blurring"
+    }
+
+    /** 命中缓存返回独立副本（mutate），避免多窗口共享同一 Drawable 实例导致状态冲突 */
+    fun getCachedBgImage(signature: String): Drawable? =
+        bgDrawableCache.get(signature)?.constantState?.newDrawable()?.mutate()
+
+    /** 缓存解码结果 */
+    fun cacheBgImage(signature: String, drawable: Drawable) {
+        bgDrawableCache.put(signature, drawable)
+        lastBgImage = signature to drawable
+    }
+
+    /** 最近一次应用的背景图（排除指定签名），供未命中缓存时作占位，返回独立副本 */
+    fun getLastBgImage(excludeSignature: String): Drawable? =
+        lastBgImage?.takeIf { it.first != excludeSignature }
+            ?.second?.constantState?.newDrawable()?.mutate()
 
     suspend fun upConfig() {
         addConfigs(DefaultData.themeConfigs)
@@ -275,7 +351,7 @@ object ThemeConfig {
     }
 
     suspend fun addConfigs(newConfigs: List<Config>?) {
-        val newConfigs = newConfigs?.filter{
+        val newConfigs = newConfigs?.filter {
             validateConfig(it)
         }
         if (newConfigs.isNullOrEmpty()) {
@@ -437,7 +513,7 @@ object ThemeConfig {
             bottomBackground = "#${bBackground.hexString}",
             transparentNavBar = transparentNavBar,
             backgroundImgPath = bgImgPath,
-            backgroundImgBlur = bgImgBlur
+            backgroundImgBlur = bgImgBlur,
         )
     }
 
@@ -450,12 +526,12 @@ object ThemeConfig {
         val primary =
             context.getPrefInt(
                 PreferKey.cNPrimary,
-                context.getCompatColor(R.color.default_night_primary)
+                context.getCompatColor(R.color.default_night_primary),
             )
         val accent =
             context.getPrefInt(
                 PreferKey.cNAccent,
-                context.getCompatColor(R.color.default_night_accent)
+                context.getCompatColor(R.color.default_night_accent),
             )
         val background =
             context.getPrefInt(PreferKey.cNBackground, context.getCompatColor(R.color.default_night_background))
@@ -476,7 +552,7 @@ object ThemeConfig {
             bottomBackground = "#${bBackground.hexString}",
             transparentNavBar = transparentNavBar,
             backgroundImgPath = bgImgPath,
-            backgroundImgBlur = bgImgBlur
+            backgroundImgBlur = bgImgBlur,
         )
     }
 
@@ -593,25 +669,23 @@ object ThemeConfig {
         var bottomBackground: String,
         var transparentNavBar: Boolean,
         var backgroundImgPath: String?,
-        var backgroundImgBlur: Int
+        var backgroundImgBlur: Int,
     ) {
 
-        override fun hashCode(): Int {
-            return GSON.toJson(this).hashCode()
-        }
+        override fun hashCode(): Int = GSON.toJson(this).hashCode()
 
         override fun equals(other: Any?): Boolean {
             other ?: return false
             if (other is Config) {
-                return other.themeName == themeName
-                        && other.isNightTheme == isNightTheme
-                        && other.primaryColor == primaryColor
-                        && other.accentColor == accentColor
-                        && other.backgroundColor == backgroundColor
-                        && other.bottomBackground == bottomBackground
-                        && other.transparentNavBar == transparentNavBar
-                        && other.backgroundImgPath == backgroundImgPath
-                        && other.backgroundImgBlur == backgroundImgBlur
+                return other.themeName == themeName &&
+                    other.isNightTheme == isNightTheme &&
+                    other.primaryColor == primaryColor &&
+                    other.accentColor == accentColor &&
+                    other.backgroundColor == backgroundColor &&
+                    other.bottomBackground == bottomBackground &&
+                    other.transparentNavBar == transparentNavBar &&
+                    other.backgroundImgPath == backgroundImgPath &&
+                    other.backgroundImgBlur == backgroundImgBlur
             }
             return false
         }
@@ -625,9 +699,7 @@ object ThemeConfig {
             "bottomBackground" to bottomBackground,
             "transparentNavBar" to transparentNavBar,
             "backgroundImgPath" to backgroundImgPath,
-            "backgroundImgBlur" to backgroundImgBlur
+            "backgroundImgBlur" to backgroundImgBlur,
         )
-
     }
-
 }

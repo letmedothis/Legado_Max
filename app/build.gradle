@@ -207,6 +207,8 @@ android {
     }
     lint {
         checkDependencies = true
+        // 存量问题基线：初次启用 lint 门禁时一次全量生成，此后 lint 只拦新增问题
+        baseline = file("lint-baseline.xml")
     }
     tasks.withType(JavaCompile).tap {
         configureEach {

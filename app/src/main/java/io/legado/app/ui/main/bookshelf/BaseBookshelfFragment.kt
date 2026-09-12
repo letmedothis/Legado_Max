@@ -16,7 +16,6 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
 import io.legado.app.databinding.DialogEditTextBinding
-import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.about.AppLogDialog
@@ -33,7 +32,6 @@ import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.checkByIndex
 import io.legado.app.utils.getCheckedIndex
-import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.readText
 import io.legado.app.help.ExportResultHandler
@@ -46,7 +44,8 @@ import io.legado.app.utils.toastOnUi
  * 书架Fragment基类
  * 处理书架界面相关的逻辑，包括菜单操作、书籍导入导出等功能
  */
-abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfViewModel>(layoutId),
+abstract class BaseBookshelfFragment(layoutId: Int) :
+    VMBaseFragment<BookshelfViewModel>(layoutId),
     MainFragmentInterface {
 
     override val position: Int? get() = arguments?.getInt("position")
@@ -64,20 +63,26 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             toastOnUi(it.localizedMessage ?: "ERROR")
         }
     }
+
     /** 导出书单结果的ActivityResultLauncher，用于选择保存位置 */
     private val exportResult = registerForActivityResult(HandleFileContract()) {
         ExportResultHandler.handleExportResult(requireActivity() as androidx.appcompat.app.AppCompatActivity, it, { text ->
             requireContext().sendToClip(text)
         }, null)
     }
+
     /** 当前分组ID，用于确定导入书籍的分组 */
     abstract val groupId: Long
+
     /** 当前书架的书籍列表 */
     abstract val books: List<Book>
+
     /** 是否只更新已读书籍的目录 */
     abstract var onlyUpdateRead: Boolean
+
     /** 分组LiveData观察者 */
     private var groupsLiveData: LiveData<List<BookGroup>>? = null
+
     /** 添加书籍时的等待对话框 */
     private val waitDialog by lazy {
         WaitDialog(requireContext()).apply {
@@ -385,5 +390,4 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             }
         }
     }
-
 }

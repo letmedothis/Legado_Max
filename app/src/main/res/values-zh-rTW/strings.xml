@@ -186,6 +186,7 @@
     <string name="book_file_selector">新增書籍</string>
     <string name="scan_book_source">掃描</string>
     <string name="copy_source">複製源</string>
+    <string name="paste">貼上</string>
     <string name="paste_source">貼上源</string>
     <string name="source_rule_s">源規則說明</string>
     <string name="check_update">檢查更新</string>
@@ -702,6 +703,8 @@
     <string name="add_to_text_context_menu_s">長按文字在操作選單中顯示閱讀·搜尋</string>
     <string name="add_to_text_context_menu_t">文字操作顯示搜尋</string>
     <string name="record_log">記錄日誌</string>
+    <string name="debug_log">除錯日誌</string>
+    <string name="export_log">匯出日誌</string>
     <string name="log">日誌</string>
     <string name="chinese_converter">中文簡繁體轉換</string>
     <string name="change_icon_error">圖示為向量圖示，Android8.0以前不支援</string>
@@ -765,6 +768,7 @@
     <string name="source_auto_changing">正在自動換源</string>
     <string name="click_to_apply">點擊加入</string>
     <string name="middle">中</string>
+    <string name="more">更多</string>
     <string name="information">訊息</string>
     <string name="switchLayout">切換布局</string>
     <string name="text_font_weight_converter">文章字重轉換</string>
@@ -902,6 +906,19 @@
     <string name="export_to_web_dav">匯出到WebDav</string>
     <string name="reverse_content">反轉內容</string>
     <string name="debug">除錯</string>
+    <string name="source_used_api">源所用API</string>
+    <string name="api_category_variable">內建變數</string>
+    <string name="api_category_function">內建函數</string>
+    <string name="api_category_source_method">源物件方法</string>
+    <string name="api_used">已使用</string>
+    <string name="api_not_used">未使用</string>
+    <string name="api_no_usage">該API未在本源中使用</string>
+    <string name="api_empty_list">暫無條目</string>
+    <string name="api_copied">已複製「%1$s」</string>
+    <string name="api_copy_mode_enabled">已開啟複製模式</string>
+    <string name="api_copy_mode_disabled">已關閉複製模式</string>
+    <string name="api_usage_locations">「%1$s」的使用位置</string>
+    <string name="api_source_not_found">找不到該書源</string>
     <string name="crash_log">當機日誌</string>
     <string name="use_zh_layout">使用自訂中文分行</string>
     <string name="image_style">圖片樣式</string>
@@ -1339,6 +1356,7 @@
     <string name="clipboard_import_remember">記住我的選擇</string>
     <string name="clipboard_import_auto_toast">已自動讀取剪貼簿中的匯入口令</string>
     <string name="cover_html_code">封面 HTML 程式碼</string>
+    <string name="cover_html_template">封面 HTML 範本</string>
     <string name="cover_html_code_summary">自訂封面 HTML 程式碼</string>
     <string name="cover_html_enable">啟用封面 HTML</string>
     <string name="cover_html_enable_summary">使用 HTML 產生預設封面</string>
@@ -1464,6 +1482,7 @@
     <string name="touch_page_anim_speed_title">觸控翻頁動畫速度</string>
     <string name="unsafe_ssl_summary">允許不安全 SSL 憑證連線</string>
     <string name="unsafe_ssl_title">不安全 SSL</string>
+    <string name="url_record_count">共 %1$d 條記錄</string>
     <string name="url_record">URL 存取記錄</string>
     <string name="verbose_update_log">詳細更新日誌</string>
     <string name="verbose_update_log_summary">記錄更詳細的更新過程日誌</string>
@@ -1498,6 +1517,7 @@
     <string name="share_rules">分享規則</string>
     <string name="export_rules">匯出規則</string>
     <string name="import_from_clipboard">從剪貼簿匯入</string>
+    <string name="import_zip">匯入zip</string>
     <string name="cover_gallery">封面圖集</string>
     <string name="cover_gallery_summary">管理分組封面圖集，可設為全域預設封面來源</string>
     <string name="cronet">Cronet</string>

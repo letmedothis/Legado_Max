@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,8 +18,7 @@ import io.legado.app.R
 import io.legado.app.ui.theme.pageCardElevatedContainerColor
 import io.legado.app.ui.theme.pageMutedIconTint
 import io.legado.app.ui.theme.pageSecondaryTextColor
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 
@@ -29,33 +27,11 @@ import io.legado.app.ui.widget.components.navigationBarBottomInset
 fun PermissionManageScreen(
     onBackClick: () -> Unit
 ) {
-    val topBarColors = pageTopBarColors()
-
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Text(
-                        text = stringResource(R.string.permission_manage),
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                }
+            AppPageTopBar(
+                title = stringResource(R.string.permission_manage),
+                onBackClick = onBackClick
             )
         }
     ) { paddingValues ->

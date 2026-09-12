@@ -8,11 +8,10 @@ import io.legado.app.utils.fromJsonObject
 import kotlinx.parcelize.IgnoredOnParcel
 import java.util.concurrent.ConcurrentHashMap
 
-
 // 订阅收藏表
 @Entity(
     tableName = "rssStars",
-    primaryKeys = ["origin", "link"]
+    primaryKeys = ["origin", "link"],
 )
 data class RssStar(
     override var origin: String = "",
@@ -32,7 +31,7 @@ data class RssStar(
     var type: Int = 0,
     /**阅读进度**/
     @ColumnInfo(defaultValue = "0")
-    var durPos: Int = 0
+    var durPos: Int = 0,
 ) : BaseRssArticle {
 
     @delegate:Transient
@@ -54,7 +53,7 @@ data class RssStar(
         group = group,
         variable = variable,
         type = type,
-        durPos = durPos
+        durPos = durPos,
     )
 
     fun toRecord() = RssReadRecord(
@@ -66,6 +65,6 @@ data class RssStar(
         image = image,
         type = type,
         durPos = durPos,
-        pubDate = pubDate
+        pubDate = pubDate,
     )
 }

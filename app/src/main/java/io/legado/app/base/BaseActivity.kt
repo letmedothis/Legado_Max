@@ -3,6 +3,7 @@ package io.legado.app.base
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -15,6 +16,7 @@ import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -40,6 +42,9 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyBackgroundTint
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import io.legado.app.utils.disableAutoFill
 import io.legado.app.utils.fullScreen
 import io.legado.app.utils.hideSoftInput
@@ -57,8 +62,9 @@ abstract class BaseActivity<VB : ViewBinding>(
     private val toolBarTheme: Theme = Theme.Auto,
     private val transparent: Boolean = false,
     private val imageBg: Boolean = true,
-    private val showOpenMenuIcon: Boolean = true
-) : AppCompatActivity(), ReadAloudMiniBarHost {
+    private val showOpenMenuIcon: Boolean = true,
+) : AppCompatActivity(),
+    ReadAloudMiniBarHost {
 
     protected abstract val binding: VB
     private var readAloudMiniBarController: ReadAloudMiniBarController? = null
@@ -81,7 +87,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         parent: View?,
         name: String,
         context: Context,
-        attrs: AttributeSet
+        attrs: AttributeSet,
     ): View? {
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
             (parent.parent as View).setBackgroundColor(backgroundColor)
@@ -107,7 +113,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         onBackPressedDispatcher.addCallback(this) {
             finish()
         }
-        observeLiveBus()    // 模板方法：子类覆写 observeLiveBus() 注册事件订阅，自动在 onCreate 中调用
+        observeLiveBus() // 模板方法：子类覆写 observeLiveBus() 注册事件订阅，自动在 onCreate 中调用
         observeEvent<Int>(EventBus.ALOUD_STATE) {
             refreshReadAloudMiniBar()
         }
@@ -183,12 +189,12 @@ abstract class BaseActivity<VB : ViewBinding>(
             Theme.Transparent -> setTheme(R.style.AppTheme_Transparent)
             Theme.Dark -> {
                 setTheme(R.style.AppTheme_Dark)
-               window.decorView.applyBackgroundTint(backgroundColor)
+                window.decorView.applyBackgroundTint(backgroundColor)
             }
 
             Theme.Light -> {
                 setTheme(R.style.AppTheme_Light)
-               window.decorView.applyBackgroundTint(backgroundColor)
+                window.decorView.applyBackgroundTint(backgroundColor)
             }
 
             else -> {
@@ -197,22 +203,65 @@ abstract class BaseActivity<VB : ViewBinding>(
                 } else {
                     setTheme(R.style.AppTheme_Dark)
                 }
-               window.decorView.applyBackgroundTint(backgroundColor)
+                window.decorView.applyBackgroundTint(backgroundColor)
             }
         }
     }
 
     open fun upBackgroundImage() {
         if (imageBg) {
-            try {
-                ThemeConfig.getBgImage(this, windowManager.windowSize)?.let { drawable ->
-                   window.decorView.background = drawable
-                }
-            } catch (_: OutOfMemoryError) {
-                toastOnUi("背景图片太大,内存溢出")
-            } catch (e: Exception) {
-                AppLog.put("加载背景出错\n${e.localizedMessage}", e)
+            val signature = ThemeConfig.getBackgroundSignature(this)
+            // 命中进程级缓存：同步应用，Activity 重建/返回主界面时无需重新解码，无闪烁
+            val cached = ThemeConfig.getCachedBgImage(signature)
+            if (cached != null) {
+                onBackgroundDrawableLoaded(cached)
+                return
             }
+            // 未命中缓存：先用最近一次应用的背景图占位（如有），
+            // 避免异步解码期间先显示纯色底再跳变成背景图
+            var placeholderApplied = false
+            ThemeConfig.getLastBgImage(signature)?.let {
+                onBackgroundDrawableLoaded(it)
+                placeholderApplied = true
+            }
+            val windowSize = windowManager.windowSize
+            lifecycleScope.launch(Dispatchers.Default) {
+                val drawable = try {
+                    ThemeConfig.getBgImage(this@BaseActivity, windowSize)
+                } catch (_: OutOfMemoryError) {
+                    toastOnUi("背景图片太大,内存溢出")
+                    null
+                } catch (e: Exception) {
+                    AppLog.put("加载背景出错\n${e.localizedMessage}", e)
+                    null
+                }
+                withContext(Dispatchers.Main) {
+                    if (!isFinishing && !isDestroyed) {
+                        if (drawable != null) {
+                            ThemeConfig.cacheBgImage(signature, drawable)
+                            onBackgroundDrawableLoaded(drawable)
+                        } else if (!placeholderApplied) {
+                            // 加载失败且无占位时才通知空背景（清除旧背景），
+                            // 有占位时保留占位图，避免闪回纯色
+                            onBackgroundDrawableLoaded(null)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 背景图异步解码完成回调（主线程）。
+     *
+     * [drawable] 为 null 表示无背景图配置或加载失败。
+     * 子类若需要在背景就绪后做同步处理（如同步到其他 View），
+     * 必须覆写本方法而非在 [upBackgroundImage] 调用后同步取值——
+     * 解码是异步的，[upBackgroundImage] 返回时背景尚未生效。
+     */
+    protected open fun onBackgroundDrawableLoaded(drawable: Drawable?) {
+        if (drawable != null) {
+            window.decorView.background = drawable
         }
     }
 
@@ -285,13 +334,11 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     open override fun onReadAloudMiniBarLongClick(): Boolean = false
 
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        return try {
-            super.dispatchTouchEvent(ev)
-        } catch (e: IllegalArgumentException) {
-            e.printStackTrace()
-            false
-        }
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean = try {
+        super.dispatchTouchEvent(ev)
+    } catch (e: IllegalArgumentException) {
+        e.printStackTrace()
+        false
     }
 
     override fun finish() {

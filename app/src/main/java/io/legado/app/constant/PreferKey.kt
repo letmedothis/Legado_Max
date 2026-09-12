@@ -67,14 +67,19 @@ object PreferKey {
     const val showMoreInfoInList = "showMoreInfoInList"
     const val showIntroInList = "showIntroInList"
     const val showCategoryInfoInList = "showCategoryInfoInList"
+
     // 书架显示阅读进度开关
     const val showBookshelfReadProgress = "showBookshelfReadProgress"
+
     // 书籍外边框开关（仅在列表/紧凑列表视图时生效）
     const val showBookBorder = "showBookBorder"
+
     // 简介显示行数（1-4行）
     const val introLinesInList = "introLinesInList"
+
     // 下拉选择分组开关（仅在分组样式为标签时生效）
     const val dropdownSelectGroup = "dropdownSelectGroup"
+
     // 显示标签栏开关
     const val showBookshelfTagBar = "showBookshelfTagBar"
     const val bookExportFileName = "bookExportFileName"
@@ -170,9 +175,9 @@ object PreferKey {
     const val textMenuVisibleCount = "textMenuVisibleCount"
     const val textMenuCustomTitles = "textMenuCustomTitles"
     const val processTextCustomTitles = "processTextCustomTitles"
-    const val hiddenTextMenuItems = "hiddenTextMenuItems"  // 隐藏的文本菜单项ID列表，用逗号分隔
-    const val textMenuItemOrder = "textMenuItemOrder"  // 文本菜单项排序，JSON数组格式的ID列表
-    const val hiddenProcessTextItems = "hiddenProcessTextItems"  // 隐藏的其他应用菜单项列表，格式：包名/类名,用逗号分隔
+    const val hiddenTextMenuItems = "hiddenTextMenuItems" // 隐藏的文本菜单项ID列表，用逗号分隔
+    const val textMenuItemOrder = "textMenuItemOrder" // 文本菜单项排序，JSON数组格式的ID列表
+    const val hiddenProcessTextItems = "hiddenProcessTextItems" // 隐藏的其他应用菜单项列表，格式：包名/类名,用逗号分隔
     const val doublePageHorizontal = "doubleHorizontalPage"
     const val readUrlOpenInBrowser = "readUrlInBrowser"
     const val defaultBookTreeUri = "defaultBookTreeUri"
@@ -194,8 +199,10 @@ object PreferKey {
     const val welcomeShowIconDark = "welcomeShowIconDark"
     const val pageTouchSlop = "pageTouchSlop"
     const val pageTouchClick = "pageTouchClick"
+
     /** 触摸翻页动画速度(毫秒) */
     const val touchPageAnimSpeed = "touchPageAnimSpeed"
+
     /** 按键翻页动画速度(毫秒) */
     const val keyPageAnimSpeed = "keyPageAnimSpeed"
     const val showAddToShelfAlert = "showAddToShelfAlert"
@@ -303,8 +310,10 @@ object PreferKey {
 
     /** 发现列表网格模式列数配置，默认2列 */
     const val exploreShowColumn = "exploreShowColumn"
+
     /** 发现列表瀑布流模式列数配置，默认2列 */
     const val exploreShowColumnWaterfall = "exploreShowColumnWaterfall"
+
     /** 发现列表布局模式，由"切换布局"菜单控制 */
     const val exploreGridMode = "exploreGridMode"
 
@@ -313,10 +322,13 @@ object PreferKey {
 
     /** 首页布局模式 0: 混合列表 1: 分源Tab */
     const val homepageLayoutMode = "homepageLayoutMode"
+
     /** 首页隐藏书源列表JSON */
     const val homepageSourceHidden = "homepageSourceHidden"
+
     /** 首页预加载模式：0=仅当前集，1=当前集+相邻集 */
     const val homepagePreload = "homepagePreload"
+
     /** 是否显示首页tab */
     const val showHomepage = "showHomepage"
 
@@ -325,6 +337,7 @@ object PreferKey {
 
     /** 发现详情页显示分类Tab开关 */
     const val exploreShowCategoryTab = "exploreShowCategoryTab"
+
     /** 发现详情页预加载模式：0=仅当前分类，1=当前分类+相邻分类 */
     const val exploreShowPreload = "exploreShowPreload"
 
@@ -353,6 +366,7 @@ object PreferKey {
 
     /** 书架分组配置的标签，JSON Map<groupId, List<tag>> */
     const val bookshelfGroupTags = "bookshelfGroupTags"
+
     /** 书架分组隐藏的标签，JSON Map<groupId, Set<tag>> */
     const val bookshelfHiddenTags = "bookshelfHiddenTags"
 }

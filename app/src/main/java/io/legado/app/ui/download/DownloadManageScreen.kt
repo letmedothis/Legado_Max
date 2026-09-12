@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Badge
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import io.legado.app.ui.widget.components.navigationBarBottomInset
  * 下载管理主界面
  * 显示下载任务列表，支持取消、重试、清除等操作
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadManageScreen(
     viewModel: DownloadManageViewModel,

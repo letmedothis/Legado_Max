@@ -14,10 +14,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.BookSource
-import io.legado.app.data.entities.readRecord.ReadRecord
-import io.legado.app.data.entities.readRecord.ReadRecordSession
 import io.legado.app.data.entities.readRecord.ReadRecordSource
-import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -80,9 +77,6 @@ object AudioPlay : CoroutineScope by MainScope() {
     var inBookshelf = false
     var bookSource: BookSource? = null
     val loadingChapters = arrayListOf<Int>()
-    private val readRecord = ReadRecord()
-    private var sessionStartTime = 0L
-    var readStartTime: Long = System.currentTimeMillis()
     private var lastProgressSaveTime = 0L
     val executor = globalExecutor
 
@@ -125,12 +119,6 @@ object AudioPlay : CoroutineScope by MainScope() {
     fun resetData(book: Book) {
         stop()
         AudioPlay.book = book
-        readRecord.bookName = book.name
-        readRecord.bookAuthor = book.author
-        readRecord.deviceId = AppConst.androidId
-        readRecord.lastRead = System.currentTimeMillis()
-        sessionStartTime = System.currentTimeMillis()
-        readStartTime = System.currentTimeMillis()
         lastProgressSaveTime = 0L
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -157,55 +145,35 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     /**
-     * 更新阅读时间
+     * 阅读暂停/停止：以当前章节名收口并落库当前会话
      */
-    fun upReadTime() {
+    fun flushReadTime() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        executor.execute {
-            val now = System.currentTimeMillis()
-            
-            readRecord.readTime = readRecord.readTime + now - readStartTime
-            readStartTime = now
-            readRecord.lastRead = now
-            readRecord.durChapterTitle = book?.durChapterTitle.orEmpty()
-
-            val session = ReadRecordSession(
-                deviceId = readRecord.deviceId,
-                bookName = readRecord.bookName,
-                bookAuthor = readRecord.bookAuthor,
-                startTime = sessionStartTime,
-                endTime = now,
-                words = 0,
-                durChapterTitle = readRecord.durChapterTitle,
-                source = ReadRecordSource.AUDIO.name
-            )
-            
-            val repository = ReadRecordRepository(appDb.readRecordDao)
-            try {
-                kotlinx.coroutines.runBlocking {
-                    repository.saveReadSession(session)
-                }
-            } catch (e: Exception) {
-                kotlinx.coroutines.runBlocking {
-                    appDb.readRecordDao.insert(readRecord)
-                }
-            }
-            
-            sessionStartTime = now
-        }
+        val book = book ?: return
+        ReadSessionRecorder.onReadTick(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            bookAuthor = book.author,
+            chapterTitle = book.durChapterTitle.orEmpty(),
+            source = ReadRecordSource.AUDIO.name,
+        )
+        ReadSessionRecorder.flush()
     }
 
     fun markReadStart() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        readRecord.source = ReadRecordSource.AUDIO.name
-        val now = System.currentTimeMillis()
-        sessionStartTime = now
-        readStartTime = now
-        readRecord.lastRead = now
+        val book = book ?: return
+        ReadSessionRecorder.onReadStart(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            bookAuthor = book.author,
+            chapterTitle = book.durChapterTitle.orEmpty(),
+            source = ReadRecordSource.AUDIO.name,
+        )
     }
 
     /**
@@ -346,7 +314,6 @@ object AudioPlay : CoroutineScope by MainScope() {
      */
     fun pause(context: Context) {
         if (AudioPlayService.isRun) {
-            readStartTime = System.currentTimeMillis()
             context.startService<AudioPlayService> {
                 action = IntentAction.pause
             }
@@ -446,7 +413,7 @@ object AudioPlay : CoroutineScope by MainScope() {
      */
     fun next() {
         stopPlay()
-        upReadTime()
+        flushReadTime()
         when (playMode) {
             PlayMode.LIST_END_STOP -> {
                 if (durChapterIndex + 1 < simulatedChapterSize) {

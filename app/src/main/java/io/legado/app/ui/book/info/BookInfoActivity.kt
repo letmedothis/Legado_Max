@@ -65,7 +65,6 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebJsExtensions.Companion.wrapUseWebHtml
 import io.legado.app.help.webView.WebViewPool
-import io.legado.app.help.webView.WebViewPool.fitInlineContent
 import io.legado.app.help.webView.WebViewPool.installInlineContentRefitOnTouch
 import io.legado.app.help.webView.WebViewPool.prepareForInlineContent
 import io.legado.app.help.webView.WebViewPool.scheduleInlineContentFit
@@ -214,7 +213,7 @@ class BookInfoActivity :
             }
         } ?: let {
             if (!viewModel.inBookshelf) {
-                viewModel.delBook(clearSearchBooks = false) //进目录会保存book，此时退出目录触发的book删除，保留搜索记录以便再次进入
+                viewModel.delBook(clearSearchBooks = false) // 进目录会保存book，此时退出目录触发的book删除，保留搜索记录以便再次进入
             }
         }
     }
@@ -224,7 +223,7 @@ class BookInfoActivity :
         }
     }
     private val readBookResult = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
+        ActivityResultContracts.StartActivityForResult(),
     ) {
         viewModel.upBook(intent)
         when (it.resultCode) {
@@ -240,14 +239,14 @@ class BookInfoActivity :
         }
     }
     private val infoEditResult = registerForActivityResult(
-        StartActivityContract(BookInfoEditActivity::class.java)
+        StartActivityContract(BookInfoEditActivity::class.java),
     ) {
         if (it.resultCode == RESULT_OK) {
             viewModel.upEditBook()
         }
     }
     private val editSourceResult = registerForActivityResult(
-        StartActivityContract(BookSourceEditActivity::class.java)
+        StartActivityContract(BookSourceEditActivity::class.java),
     ) {
         if (it.resultCode == RESULT_CANCELED) {
             return@registerForActivityResult
@@ -268,6 +267,7 @@ class BookInfoActivity :
     private var editMenuItem: MenuItem? = null
     private var menuCustomBtn: MenuItem? = null
     private var authorOtherWorksRawBooks = emptyList<SearchBook>()
+
     /** 书籍底部弹窗状态 */
     private var showBookSheet by mutableStateOf(false)
     private var selectedBook by mutableStateOf<SearchBook?>(null)
@@ -293,7 +293,7 @@ class BookInfoActivity :
 
     private val imgAvailableWidth by lazy {
         val textView = introTextView
-        textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx()  //8是为了文字对齐额外的右边距
+        textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx() // 8是为了文字对齐额外的右边距
     }
     private var initGetter = false
     private val glideImageGetter by lazy {
@@ -303,14 +303,14 @@ class BookInfoActivity :
             introTextView,
             lifecycle,
             imgAvailableWidth,
-            viewModel.bookSource?.bookSourceUrl
+            viewModel.bookSource?.bookSourceUrl,
         )
     }
 
     private val textViewTagHandler by lazy {
         TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
             override fun onButtonClick(name: String, click: String) {
-                viewModel.onButtonClick(this@BookInfoActivity, "info button $name" , click)
+                viewModel.onButtonClick(this@BookInfoActivity, "info button $name", click)
             }
         })
     }
@@ -402,7 +402,7 @@ class BookInfoActivity :
                             SourceCallBack.CLICK_CUSTOM_BUTTON,
                             viewModel.bookSource,
                             book,
-                            null
+                            null,
                         )
                     }
                 }
@@ -426,7 +426,7 @@ class BookInfoActivity :
                         viewModel.bookSource,
                         it,
                         null,
-                        result = shareStr
+                        result = shareStr,
                     ) {
                         val intent = Intent(Intent.ACTION_SEND)
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -459,7 +459,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     it,
                     null,
-                    result = it.bookUrl
+                    result = it.bookUrl,
                 ) {
                     sendToClip(it.bookUrl)
                 }
@@ -472,7 +472,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     it,
                     null,
-                    result = it.tocUrl
+                    result = it.tocUrl,
                 ) {
                     sendToClip(it.tocUrl)
                 }
@@ -493,16 +493,16 @@ class BookInfoActivity :
             }
 
             R.id.menu_clear_cache -> viewModel.getBook()?.let { book ->
-                    alert(R.string.clear_cache) {
-                        setMessage(getString(R.string.sure_clear_cache, book.name))
-                        noButton()
-                        yesButton {
-                            SourceCallBack.callBackBtn(this@BookInfoActivity, SourceCallBack.CLICK_CLEAR_CACHE, viewModel.bookSource, book, null) {
-                                viewModel.clearCache(book)
-                            }
+                alert(R.string.clear_cache) {
+                    setMessage(getString(R.string.sure_clear_cache, book.name))
+                    noButton()
+                    yesButton {
+                        SourceCallBack.callBackBtn(this@BookInfoActivity, SourceCallBack.CLICK_CLEAR_CACHE, viewModel.bookSource, book, null) {
+                            viewModel.clearCache(book)
                         }
                     }
                 }
+            }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
             R.id.menu_split_long_chapter -> {
                 upLoading(true)
@@ -552,13 +552,15 @@ class BookInfoActivity :
             }
         }
 
-        observeEvent<Boolean>(EventBus.REFRESH_BOOK_INFO) { //书源js函数触发刷新
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_INFO) {
+            // 书源js函数触发刷新
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 refreshBook()
             }
         }
 
-        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //书源js函数触发刷新
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) {
+            // 书源js函数触发刷新
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 refreshToc()
             }
@@ -601,7 +603,7 @@ class BookInfoActivity :
                 bookWebDav
                     ?.upload(book)
                     ?: throw NoStackTraceException("未配置webDav")
-                //更新书籍最后更新时间,使之比远程书籍的时间新
+                // 更新书籍最后更新时间,使之比远程书籍的时间新
                 book.lastCheckTime = System.currentTimeMillis()
                 viewModel.saveBook(book)
             } catch (e: Exception) {
@@ -643,12 +645,12 @@ class BookInfoActivity :
     }
 
     inner class CustomWebViewClient(
-        private val source: BaseSource?
+        private val source: BaseSource?,
     ) : WebViewClient() {
         private val jsStr = buildUseWebInjection(source)
         override fun shouldOverrideUrlLoading(
             view: WebView?,
-            request: WebResourceRequest?
+            request: WebResourceRequest?,
         ): Boolean {
             request?.let {
                 val uri = it.url
@@ -694,7 +696,7 @@ class BookInfoActivity :
                 return
             }
             val html = wrapUseWebHtml(intro.substring(8, lastIndex), viewModel.bookSource)
-            val pooledWebView = this.pooledWebView ?: let{
+            val pooledWebView = this.pooledWebView ?: let {
                 val pooledWebView = WebViewPool.acquire(this, Scope.INLINE)
                 val webView = pooledWebView.realWebView
                 webView.onResume()
@@ -753,8 +755,8 @@ class BookInfoActivity :
                     showDialogFragment(PhotoDialog(it, viewModel.bookSource?.bookSourceUrl))
                 },
                 imgOnClickListener = {
-                    viewModel.onButtonClick(this@BookInfoActivity, "info image" , it)
-                }
+                    viewModel.onButtonClick(this@BookInfoActivity, "info image", it)
+                },
             )
         } else if (intro.startsWith("<md>")) {
             val lastIndex = intro.lastIndexOf("<")
@@ -782,9 +784,9 @@ class BookInfoActivity :
                                     .applyDefaultRequestOptions(
                                         RequestOptions()
                                             .override(imgAvailableWidth)
-                                            .encodeQuality(88)
-                                    )
-                            )
+                                            .encodeQuality(88),
+                                    ),
+                            ),
                         )
                         .usePlugin(HtmlPlugin.create())
                         .usePlugin(TablePlugin.create(context))
@@ -796,7 +798,7 @@ class BookInfoActivity :
                     markdown,
                     imgOnLongClickListener = { source ->
                         showDialogFragment(PhotoDialog(source, viewModel.bookSource?.bookSourceUrl))
-                    }
+                    },
                 )
             }
         } else {
@@ -834,7 +836,7 @@ class BookInfoActivity :
                             source,
                             book,
                             null,
-                            result = kind
+                            result = kind,
                         ) {
                             SearchActivity.start(this@BookInfoActivity, source, kind)
                         }
@@ -846,10 +848,10 @@ class BookInfoActivity :
                             source,
                             book,
                             null,
-                            result = kind
+                            result = kind,
                         )
                         true
-                    }
+                    },
                 )
             }
         }
@@ -873,7 +875,7 @@ class BookInfoActivity :
             chapterList.isNullOrEmpty() -> {
                 binding.tvToc.text = getString(
                     R.string.toc_s,
-                    getString(R.string.error_load_toc)
+                    getString(R.string.error_load_toc),
                 )
                 binding.tvLasted.text = getString(R.string.lasted_show, book?.latestChapterTitle)
             }
@@ -932,15 +934,15 @@ class BookInfoActivity :
         ivCover.setOnClickListener {
             viewModel.getBook()?.let {
                 showDialogFragment(
-                    ChangeCoverDialog(it.name, it.author)
+                    ChangeCoverDialog(it.name, it.author),
                 )
             }
         }
         ivCover.setOnLongClickListener {
             viewModel.getBook()?.let { book ->
                 BookCover.getDisplayCover(book)?.let { path ->
-                showDialogFragment(PhotoDialog(path, isBook = true))
-            }
+                    showDialogFragment(PhotoDialog(path, isBook = true))
+                }
             }
             true
         }
@@ -991,7 +993,8 @@ class BookInfoActivity :
             viewModel.getBook()?.let { book ->
                 AppLog.putReaderDebug("[TOC] 点击查看目录: bookUrl=${book.bookUrl}, inBookshelf=${viewModel.inBookshelf}, chapterListData.size=${viewModel.chapterListData.value?.size}")
                 if (!viewModel.inBookshelf) {
-                    viewModel.saveBook(book) { //点击目录会保存book
+                    viewModel.saveBook(book) {
+                        // 点击目录会保存book
                         viewModel.saveChapterList {
                             openChapterList()
                         }
@@ -1010,14 +1013,14 @@ class BookInfoActivity :
         tvChangeGroup.setOnClickListener {
             viewModel.getBook()?.let {
                 showDialogFragment(
-                    GroupSelectDialog(it.group)
+                    GroupSelectDialog(it.group),
                 )
             }
         }
         tvSetTag?.setOnClickListener {
             viewModel.getBook()?.let {
                 showDialogFragment(
-                    BookTagSelectDialog(it.customTag)
+                    BookTagSelectDialog(it.customTag),
                 )
             }
         }
@@ -1029,7 +1032,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     book,
                     null,
-                    result = book.author
+                    result = book.author,
                 ) {
                     SearchActivity.start(this@BookInfoActivity, book.author)
                 }
@@ -1043,7 +1046,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     book,
                     null,
-                    result = book.author
+                    result = book.author,
                 ) {
                     SearchActivity.start(this@BookInfoActivity, book.author)
                 }
@@ -1058,7 +1061,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     book,
                     null,
-                    result = book.name
+                    result = book.name,
                 ) {
                     SearchActivity.start(this@BookInfoActivity, book.name)
                 }
@@ -1072,7 +1075,7 @@ class BookInfoActivity :
                     viewModel.bookSource,
                     book,
                     null,
-                    result = book.name
+                    result = book.name,
                 ) {
                     SearchActivity.start(this@BookInfoActivity, book.name)
                 }
@@ -1134,8 +1137,8 @@ class BookInfoActivity :
                     getString(R.string.set_source_variable),
                     source.getKey(),
                     variable,
-                    comment
-                )
+                    comment,
+                ),
             )
         }
     }
@@ -1150,15 +1153,15 @@ class BookInfoActivity :
             val book = viewModel.getBook() ?: return@launch
             val variable = withContext(IO) { book.getCustomVariable() }
             val comment = source.getDisplayVariableComment(
-                """书籍变量可在js中通过book.getVariable("custom")获取"""
+                """书籍变量可在js中通过book.getVariable("custom")获取""",
             )
             showDialogFragment(
                 VariableDialog(
                     getString(R.string.set_book_variable),
                     book.bookUrl,
                     variable,
-                    comment
-                )
+                    comment,
+                ),
             )
         }
     }
@@ -1181,7 +1184,7 @@ class BookInfoActivity :
             if (LocalConfig.bookInfoDeleteAlert) {
                 alert(
                     titleResource = R.string.draw,
-                    messageResource = R.string.sure_del
+                    messageResource = R.string.sure_del,
                 ) {
                     var checkBox: CheckBox? = null
                     if (book.isLocal) {
@@ -1199,7 +1202,7 @@ class BookInfoActivity :
                         if (checkBox != null) {
                             LocalConfig.deleteBookOriginal = checkBox.isChecked
                         }
-                        SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) //确认后删除书架
+                        SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) // 确认后删除书架
                         viewModel.delBook(LocalConfig.deleteBookOriginal) {
                             setResult(RESULT_OK)
                             finish()
@@ -1208,7 +1211,7 @@ class BookInfoActivity :
                     noButton()
                 }
             } else {
-                SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) //点按钮直接删除书架
+                SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) // 点按钮直接删除书架
                 viewModel.delBook(LocalConfig.deleteBookOriginal) {
                     setResult(RESULT_OK)
                     finish()
@@ -1233,7 +1236,7 @@ class BookInfoActivity :
         }
         selector(
             R.string.download_and_import_file,
-            webFiles
+            webFiles,
         ) { _, webFile, _ ->
             if (webFile.isSupported) {
                 /* import */
@@ -1256,7 +1259,7 @@ class BookInfoActivity :
             } else {
                 alert(
                     title = getString(R.string.draw),
-                    message = getString(R.string.file_not_supported, webFile.name)
+                    message = getString(R.string.file_not_supported, webFile.name),
                 ) {
                     neutralButton(R.string.open_fun) {
                         /* download only */
@@ -1281,7 +1284,7 @@ class BookInfoActivity :
         }
         selector(
             R.string.import_select_book,
-            fileNames
+            fileNames,
         ) { _, name, _ ->
             viewModel.importArchiveBook(archiveFileUri, name) {
                 success?.invoke(it)
@@ -1309,23 +1312,26 @@ class BookInfoActivity :
             book.isAudio -> readBookResult.launch(
                 Intent(this, AudioPlayActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.inBookshelf)
+                    .putExtra("inBookshelf", viewModel.inBookshelf),
             )
             book.isVideo -> readBookResult.launch(
                 Intent(this, VideoPlayerActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.inBookshelf)
+                    .putExtra("inBookshelf", viewModel.inBookshelf),
             )
 
             else -> readBookResult.launch(
                 Intent(
                     this,
-                    if (!book.isLocal && book.isImage && AppConfig.showMangaUi) ReadMangaActivity::class.java
-                    else ReadBookActivity::class.java
+                    if (!book.isLocal && book.isImage && AppConfig.showMangaUi) {
+                        ReadMangaActivity::class.java
+                    } else {
+                        ReadBookActivity::class.java
+                    },
                 )
                     .putExtra("bookUrl", book.bookUrl)
                     .putExtra("inBookshelf", viewModel.inBookshelf)
-                    .putExtra("chapterChanged", chapterChanged)
+                    .putExtra("chapterChanged", chapterChanged),
             )
         }
     }
@@ -1388,19 +1394,19 @@ class BookInfoActivity :
         }
     }
 
-     override fun onStart() {
-         super.onStart()
-         if (initGetter) {
-             glideImageGetter.start()
-         }
-     }
+    override fun onStart() {
+        super.onStart()
+        if (initGetter) {
+            glideImageGetter.start()
+        }
+    }
 
-     override fun onStop() {
-         super.onStop()
-         if (initGetter) {
-             glideImageGetter.stop()
-         }
-     }
+    override fun onStop() {
+        super.onStop()
+        if (initGetter) {
+            glideImageGetter.stop()
+        }
+    }
 
     override fun onDestroy() {
         unregister(this)
@@ -1489,9 +1495,7 @@ class BookInfoActivity :
     }
 
     // SearchAdapter.CallBack 实现
-    override fun getBookShelfState(book: SearchBook): BookShelfState {
-        return viewModel.getBookShelfState(book)
-    }
+    override fun getBookShelfState(book: SearchBook): BookShelfState = viewModel.getBookShelfState(book)
 
     override fun showBookInfo(name: String, author: String, bookUrl: String, origin: String) {
         jumpToBookInfo(this) {
@@ -1540,13 +1544,13 @@ class BookInfoActivity :
                                         putExtra("bookUrl", book.bookUrl)
                                         putExtra("fromAuthorOtherWorks", true)
                                     }
-                                }
+                                },
                             )
                         }
                     }
                     val params = android.widget.FrameLayout.LayoutParams(
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                     )
                     contentView.addView(composeView, params)
                 }
@@ -1558,5 +1562,4 @@ class BookInfoActivity :
             }
         }
     }
-
 }

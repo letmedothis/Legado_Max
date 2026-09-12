@@ -5,7 +5,6 @@ import io.legado.app.api.ReturnData
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.help.DirectLinkUpload
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.storage.Backup
@@ -40,7 +39,7 @@ import androidx.core.content.edit
 /**
  * Web端备份控制器
  * 提供一键备份功能，支持下载ZIP备份文件
- * 
+ *
  * 独立于Backup.backupLocked实现，因为backupLocked会在完成后删除临时文件
  * 这里自行控制备份流程，在ZIP打包后立即读取字节数据
  */
@@ -53,27 +52,27 @@ object BackupController {
         val displayName: String,
         val description: String,
         val count: Int,
-        val size: Long
+        val size: Long,
     )
 
     data class BackupOverview(
         val fileName: String,
         val totalSize: Long,
         val createTime: Long,
-        val items: List<BackupItemInfo>
+        val items: List<BackupItemInfo>,
     )
 
     private data class BackupItemDef(
         val fileName: String,
         val displayName: String,
         val description: String,
-        val counter: () -> Int
+        val counter: () -> Int,
     )
 
     private data class ConfigItemDef(
         val fileName: String,
         val displayName: String,
-        val description: String
+        val description: String,
     )
 
     /** Web备份专用临时目录 */
@@ -118,7 +117,7 @@ object BackupController {
             return NanoHTTPD.newFixedLengthResponse(
                 NanoHTTPD.Response.Status.INTERNAL_ERROR,
                 "application/json",
-                GSON.toJson(ReturnData().setErrorMsg("备份超时"))
+                GSON.toJson(ReturnData().setErrorMsg("备份超时")),
             )
         }
 
@@ -127,7 +126,7 @@ object BackupController {
             return NanoHTTPD.newFixedLengthResponse(
                 NanoHTTPD.Response.Status.INTERNAL_ERROR,
                 "application/json",
-                GSON.toJson(ReturnData().setErrorMsg("备份失败: ${error.message}"))
+                GSON.toJson(ReturnData().setErrorMsg("备份失败: ${error.message}")),
             )
         }
 
@@ -137,7 +136,7 @@ object BackupController {
                 NanoHTTPD.Response.Status.OK,
                 "application/zip",
                 ByteArrayInputStream(zipBytes),
-                zipBytes.size.toLong()
+                zipBytes.size.toLong(),
             ).apply {
                 addHeader("Content-Disposition", "attachment; filename=\"backup.zip\"")
             }
@@ -146,7 +145,7 @@ object BackupController {
         return NanoHTTPD.newFixedLengthResponse(
             NanoHTTPD.Response.Status.INTERNAL_ERROR,
             "application/json",
-            GSON.toJson(ReturnData().setErrorMsg("备份文件生成失败"))
+            GSON.toJson(ReturnData().setErrorMsg("备份文件生成失败")),
         )
     }
 
@@ -182,7 +181,7 @@ object BackupController {
             writeListToJson(appDb.replaceRuleDao.all, "replaceRule.json", webBackupPath)
             FileUtils.createFileIfNotExist(webBackupPath + File.separator + HighlightRuleStore.backupFileName)
                 .writeText(GSON.toJson(HighlightRuleStore.backupData(appCtx)))
-            writeListToJson(Backup.mergeReadRecordsForLegacyCompat(appDb.readRecordDao.all), "readRecord.json", webBackupPath)//导出readRecord.json 进行备份时，将相同 bookName 的多条记录合并为一条记录，readTime 取 SUM，bookAuthor 取非空值。这样 原始项目恢复 Max 备份后阅读时长计算正确
+            writeListToJson(Backup.mergeReadRecordsForLegacyCompat(appDb.readRecordDao.all), "readRecord.json", webBackupPath) // 导出readRecord.json 进行备份时，将相同 bookName 的多条记录合并为一条记录，readTime 取 SUM，bookAuthor 取非空值。这样 原始项目恢复 Max 备份后阅读时长计算正确
             writeListToJson(appDb.readRecordDao.getAllDetailsList(), "readRecordDetail.json", webBackupPath)
             writeListToJson(appDb.readRecordDao.getAllSessionsList(), "readRecordSession.json", webBackupPath)
             writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", webBackupPath)
@@ -235,9 +234,12 @@ object BackupController {
                 appCtx.defaultSharedPreferences.all.forEach { (key, value) ->
                     when (key) {
                         PreferKey.webDavPassword -> {
-                            edit.putString(key, aes.runCatching {
-                                encryptBase64(value.toString())
-                            }.getOrDefault(value.toString()))
+                            edit.putString(
+                                key,
+                                aes.runCatching {
+                                    encryptBase64(value.toString())
+                                }.getOrDefault(value.toString()),
+                            )
                         }
                         else -> when (value) {
                             is Int -> edit.putInt(key, value)
@@ -363,7 +365,7 @@ object BackupController {
             },
             BackupItemDef("runtimeSourceCache.json", "书源运行数据", "书源登录信息和运行变量") {
                 appDb.cacheDao.getRuntimeSourceCacheCount(System.currentTimeMillis())
-            }
+            },
         )
 
         backupItems.forEach { item ->
@@ -372,13 +374,15 @@ object BackupController {
             val size = if (file.exists()) file.length() else 0L
             totalSize += size
 
-            items.add(BackupItemInfo(
-                fileName = item.fileName,
-                displayName = item.displayName,
-                description = item.description,
-                count = count,
-                size = size
-            ))
+            items.add(
+                BackupItemInfo(
+                    fileName = item.fileName,
+                    displayName = item.displayName,
+                    description = item.description,
+                    count = count,
+                    size = size,
+                ),
+            )
         }
 
         // 书籍缓存
@@ -400,27 +404,33 @@ object BackupController {
             val indexEstimatedSize = selectedBooks.size * 300L
             val chapterEstimatedSize = chapterCount * 200L
             totalSize += bookCacheSize + indexEstimatedSize + chapterEstimatedSize
-            items.add(BackupItemInfo(
-                fileName = "book_cache",
-                displayName = "书籍缓存",
-                description = "已缓存的章节内容文件",
-                count = selectedBooks.size,
-                size = bookCacheSize
-            ))
-            items.add(BackupItemInfo(
-                fileName = "bookCacheIndex.json",
-                displayName = "书籍缓存索引",
-                description = "缓存文件的索引信息",
-                count = selectedBooks.size,
-                size = indexEstimatedSize
-            ))
-            items.add(BackupItemInfo(
-                fileName = "bookChapterCache.json",
-                displayName = "书籍章节目录",
-                description = "缓存书籍的章节目录数据",
-                count = chapterCount,
-                size = chapterEstimatedSize
-            ))
+            items.add(
+                BackupItemInfo(
+                    fileName = "book_cache",
+                    displayName = "书籍缓存",
+                    description = "已缓存的章节内容文件",
+                    count = selectedBooks.size,
+                    size = bookCacheSize,
+                ),
+            )
+            items.add(
+                BackupItemInfo(
+                    fileName = "bookCacheIndex.json",
+                    displayName = "书籍缓存索引",
+                    description = "缓存文件的索引信息",
+                    count = selectedBooks.size,
+                    size = indexEstimatedSize,
+                ),
+            )
+            items.add(
+                BackupItemInfo(
+                    fileName = "bookChapterCache.json",
+                    displayName = "书籍章节目录",
+                    description = "缓存书籍的章节目录数据",
+                    count = chapterCount,
+                    size = chapterEstimatedSize,
+                ),
+            )
         }
 
         val configItems = listOf(
@@ -430,20 +440,22 @@ object BackupController {
             ConfigItemDef(BookCover.configFileName, "封面规则", "自定义封面生成规则"),
             ConfigItemDef(DirectLinkUpload.ruleFileName, "直链上传配置", "直链上传规则配置"),
             ConfigItemDef("config.xml", "应用设置", "应用程序偏好设置"),
-            ConfigItemDef("videoConfig.xml", "视频配置", "视频播放器设置")
+            ConfigItemDef("videoConfig.xml", "视频配置", "视频播放器设置"),
         )
 
         configItems.forEach { item ->
             val file = File(webBackupPath, item.fileName)
             if (file.exists()) {
                 totalSize += file.length()
-                items.add(BackupItemInfo(
-                    fileName = item.fileName,
-                    displayName = item.displayName,
-                    description = item.description,
-                    count = 1,
-                    size = file.length()
-                ))
+                items.add(
+                    BackupItemInfo(
+                        fileName = item.fileName,
+                        displayName = item.displayName,
+                        description = item.description,
+                        count = 1,
+                        size = file.length(),
+                    ),
+                )
             }
         }
 
@@ -457,8 +469,8 @@ object BackupController {
                     displayName = "背景图片",
                     description = "阅读背景使用的自定义图片文件",
                     count = bgFiles.size,
-                    size = bgSize
-                )
+                    size = bgSize,
+                ),
             )
         }
 
@@ -472,8 +484,8 @@ object BackupController {
                     displayName = "高亮背景图片",
                     description = "高亮规则使用的自定义背景图片",
                     count = highlightRuleBgFiles.size,
-                    size = highlightRuleBgSize
-                )
+                    size = highlightRuleBgSize,
+                ),
             )
         }
 
@@ -481,7 +493,7 @@ object BackupController {
             fileName = "backup.zip",
             totalSize = totalSize,
             createTime = System.currentTimeMillis(),
-            items = items.filter { it.count > 0 || it.size > 0 }
+            items = items.filter { it.count > 0 || it.size > 0 },
         )
     }
 }

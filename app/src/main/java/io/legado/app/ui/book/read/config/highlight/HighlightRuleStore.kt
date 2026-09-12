@@ -49,9 +49,7 @@ object HighlightRuleStore {
         RegexCache.clear()
     }
 
-    fun defaultPresetRules(context: Context): List<HighlightRule> {
-        return createDefaultRules(context)
-    }
+    fun defaultPresetRules(context: Context): List<HighlightRule> = createDefaultRules(context)
 
     fun load(context: Context): MutableList<HighlightRule> {
         cachedRules?.let { return it.toMutableList() }
@@ -78,9 +76,7 @@ object HighlightRuleStore {
         return mutableListOf()
     }
 
-    fun loadEnabled(context: Context): List<HighlightRule> {
-        return load(context).filter { it.enabled && it.pattern.isNotBlank() }
-    }
+    fun loadEnabled(context: Context): List<HighlightRule> = load(context).filter { it.enabled && it.pattern.isNotBlank() }
 
     fun save(context: Context, rules: List<HighlightRule>) {
         val json = GSON.toJson(rules)
@@ -99,20 +95,18 @@ object HighlightRuleStore {
         return defaultRules.toMutableList()
     }
 
-    fun sanitizeRule(rule: HighlightRule, fallbackGroup: String = HighlightRuleGroupStore.DEFAULT_GROUP): HighlightRule {
-        return rule.copy(
-            name = rule.name.trim(),
-            pattern = rule.pattern.trim(),
-            sampleText = rule.sampleText.trim(),
-            group = rule.group.takeIf { it.isNotBlank() } ?: fallbackGroup,
-            scope = rule.scope?.trim()?.takeIf { it.isNotBlank() },
-            excludeScope = rule.excludeScope?.trim()?.takeIf { it.isNotBlank() },
-            layoutScope = rule.layoutScope?.trim()?.takeIf { it.isNotBlank() },
-            // GSON 用 Unsafe 实例化 data class 时不调用构造函数，
-            // 老规则 JSON 缺失 themeScope 字段时反序列化得到 0，应视为全部生效而非 coerceIn(1,3)=1（仅亮色）
-            themeScope = if (rule.themeScope in 1..3) rule.themeScope else HighlightRule.THEME_ALL,
-        )
-    }
+    fun sanitizeRule(rule: HighlightRule, fallbackGroup: String = HighlightRuleGroupStore.DEFAULT_GROUP): HighlightRule = rule.copy(
+        name = rule.name.trim(),
+        pattern = rule.pattern.trim(),
+        sampleText = rule.sampleText.trim(),
+        group = rule.group.takeIf { it.isNotBlank() } ?: fallbackGroup,
+        scope = rule.scope?.trim()?.takeIf { it.isNotBlank() },
+        excludeScope = rule.excludeScope?.trim()?.takeIf { it.isNotBlank() },
+        layoutScope = rule.layoutScope?.trim()?.takeIf { it.isNotBlank() },
+        // GSON 用 Unsafe 实例化 data class 时不调用构造函数，
+        // 老规则 JSON 缺失 themeScope 字段时反序列化得到 0，应视为全部生效而非 coerceIn(1,3)=1（仅亮色）
+        themeScope = if (rule.themeScope in 1..3) rule.themeScope else HighlightRule.THEME_ALL,
+    )
 
     fun backupData(context: Context): BackupData {
         val rules = load(context)
@@ -148,7 +142,9 @@ object HighlightRuleStore {
             val restoredRules = if (backupRootPath != null) {
                 backupRules.map { rule ->
                     val restoredPath = HighlightRuleBackgroundManager.restoreFromBackup(
-                        context, backupRootPath, rule.bgImage
+                        context,
+                        backupRootPath,
+                        rule.bgImage,
                     )
                     if (restoredPath != null && restoredPath != rule.bgImage) {
                         rule.copy(bgImage = restoredPath)
@@ -171,17 +167,13 @@ object HighlightRuleStore {
         val groups = HighlightRuleGroupStore.load(context)
         context.putPrefString(
             PreferKey.highlightRuleCurrentGroup,
-            backupCurrentGroup?.takeIf { groups.contains(it) }.orEmpty()
+            backupCurrentGroup?.takeIf { groups.contains(it) }.orEmpty(),
         )
     }
 
-    fun getUsedBgImageFiles(context: Context): List<File> {
-        return HighlightRuleBackgroundManager.getUsedFiles(context, load(context))
-    }
+    fun getUsedBgImageFiles(context: Context): List<File> = HighlightRuleBackgroundManager.getUsedFiles(context, load(context))
 
-    private fun createDefaultRules(context: Context): List<HighlightRule> {
-        return HighlightRuleDefaultRules.create(context)
-    }
+    private fun createDefaultRules(context: Context): List<HighlightRule> = HighlightRuleDefaultRules.create(context)
 
     private fun normalizeRules(
         rules: List<HighlightRule>,
@@ -227,10 +219,10 @@ object HighlightRuleStore {
         // 不再因"无样式"而刷新——用户可能故意清除内置规则的样式
         val inspectText = rule.name + rule.pattern + rule.sampleText
         return rule.name.isBlank() ||
-                rule.pattern.isBlank() ||
-                garbledMarkers.any { inspectText.contains(it) } ||
-                legacyBuiltinPatterns[rule.id] == rule.pattern ||
-                legacyBuiltinSampleTexts[rule.id] == rule.sampleText
+            rule.pattern.isBlank() ||
+            garbledMarkers.any { inspectText.contains(it) } ||
+            legacyBuiltinPatterns[rule.id] == rule.pattern ||
+            legacyBuiltinSampleTexts[rule.id] == rule.sampleText
     }
 
     /** 内置规则 ID 集合 */
@@ -246,7 +238,7 @@ object HighlightRuleStore {
         "ellipsis_default",
         "number_default",
         "english_default",
-        "date_time_default"
+        "date_time_default",
     )
 
     /**
@@ -267,7 +259,7 @@ object HighlightRuleStore {
         "ellipsis_default" to "x{2,}|\\*{2,}|\\.{2,}",
         "number_default" to "[0-9零一二三四五六七八九十百千万亿]+[元块美元英镑]|[0-9]+[%％]",
         "english_default" to "[a-zA-Z]{2,}[a-zA-Z0-9'-]*",
-        "date_time_default" to "[0-9零一二三四五六七八九十]+年[0-9零一二三四五六七八九十]+月[0-9零一二三四五六七八九十]*日?|[0-9]+点[0-9零一二三四五六七八九十]*分?"
+        "date_time_default" to "[0-9零一二三四五六七八九十]+年[0-9零一二三四五六七八九十]+月[0-9零一二三四五六七八九十]*日?|[0-9]+点[0-9零一二三四五六七八九十]*分?",
     )
 
     /** 乱码标记，用于检测旧数据编码问题 */
@@ -281,19 +273,17 @@ object HighlightRuleStore {
      * 主要用于修复重构时 \\n 被错误地当作字面字符而非换行符的问题。
      */
     private val legacyBuiltinSampleTexts = mapOf(
-        "poetry_default" to "床前明月光，\\n疑是地上霜。"
+        "poetry_default" to "床前明月光，\\n疑是地上霜。",
     )
 
-    private fun normalizeTargetScope(ruleScope: Int, builtinScope: Int): Int {
-        return if (ruleScope in 0..2) ruleScope else builtinScope
-    }
+    private fun normalizeTargetScope(ruleScope: Int, builtinScope: Int): Int = if (ruleScope in 0..2) ruleScope else builtinScope
 
     /** HighlightRule 的规范字段名，用于识别混淆版本写出的损坏 JSON */
     private val canonicalFieldNames = setOf(
         "id", "name", "pattern", "isRegex", "sampleText", "group", "targetScope", "enabled",
         "textColor", "underlineMode", "underlineColor", "underlineWidth", "underlineOffset",
         "underlineSvgPath", "font", "bgColor", "bgImage", "bgImageFit", "bgImageScale",
-        "scope", "excludeScope", "layoutScope", "themeScope"
+        "scope", "excludeScope", "layoutScope", "themeScope",
     )
 
     /**

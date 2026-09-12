@@ -45,7 +45,8 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
     private val defaultGroup: String? = null,
     private val defaultScope: String? = null,
     private val onSave: (HighlightRule) -> Unit = {},
-) : BaseDialogFragment(R.layout.dialog_highlight_rule_edit, true), ColorPickerDialogListener,
+) : BaseDialogFragment(R.layout.dialog_highlight_rule_edit, true),
+    ColorPickerDialogListener,
     FontSelectDialog.CallBack {
 
     private val binding by viewBinding(DialogHighlightRuleEditBinding::bind)
@@ -92,7 +93,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         viewModel.initialize(sourceRule, defaultGroup, defaultScope)
         attachBottomSheetDismiss(
             binding.dragHandle,
-            binding.sheetContainer
+            binding.sheetContainer,
         ) { dismissAllowingStateLoss() }
 
         binding.tvPageTitle.text =
@@ -101,7 +102,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.spGroup.adapter = object : ArrayAdapter<String>(
             requireContext(),
             R.layout.item_text_common,
-            groupItems
+            groupItems,
         ) {
             override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
                 val view = super.getView(position, convertView, parent)
@@ -119,7 +120,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.spTarget.adapter = object : ArrayAdapter<String>(
             requireContext(),
             R.layout.item_text_common,
-            listOf("作用于全部", "作用于标题", "作用于正文")
+            listOf("作用于全部", "作用于标题", "作用于正文"),
         ) {
             override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
                 val view = super.getView(position, convertView, parent)
@@ -137,7 +138,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.spUnderlineMode.adapter = object : ArrayAdapter<String>(
             requireContext(),
             R.layout.item_text_common,
-            listOf("无", "实线下划线", "虚线下划线", "波浪下划线", "双下划线", "自定义SVG", "删除线", "斜体", "方框")
+            listOf("无", "实线下划线", "虚线下划线", "波浪下划线", "双下划线", "自定义SVG", "删除线", "斜体", "方框"),
         ) {
             override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
                 val view = super.getView(position, convertView, parent)
@@ -155,7 +156,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.spBgImageFit.adapter = object : ArrayAdapter<String>(
             requireContext(),
             R.layout.item_text_common,
-            listOf("平铺", "拉伸填充", "居中裁剪")
+            listOf("平铺", "拉伸填充", "居中裁剪"),
         ) {
             override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
                 val view = super.getView(position, convertView, parent)
@@ -173,7 +174,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.spThemeScope.adapter = object : ArrayAdapter<String>(
             requireContext(),
             R.layout.item_text_common,
-            listOf(getString(R.string.highlight_rule_theme_scope_all), getString(R.string.highlight_rule_theme_scope_light), getString(R.string.highlight_rule_theme_scope_dark))
+            listOf(getString(R.string.highlight_rule_theme_scope_all), getString(R.string.highlight_rule_theme_scope_light), getString(R.string.highlight_rule_theme_scope_dark)),
         ) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
@@ -244,17 +245,17 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
 
         binding.tvSaveAction.background?.mutate()?.setTint(accentColor)
         binding.tvSaveAction.setTextColor(
-            if (ColorUtils.isColorLight(accentColor)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+            if (ColorUtils.isColorLight(accentColor)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt(),
         )
 
         val disabledColor = ColorUtils.blendColors(accentColor, secondaryTextColor, 0.6f)
         binding.switchEnable.trackTintList = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(accentColor, disabledColor)
+            intArrayOf(accentColor, disabledColor),
         )
         binding.switchEnable.thumbTintList = android.content.res.ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-            intArrayOf(accentColor, secondaryTextColor)
+            intArrayOf(accentColor, secondaryTextColor),
         )
 
         val cardDrawable = GradientDrawable().apply {
@@ -293,7 +294,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         binding.etScope.setHintTextColor(secondaryTextColor)
         binding.etExcludeScope.setTextColor(primaryTextColor)
         binding.etExcludeScope.setHintTextColor(secondaryTextColor)
-        
+
         // 将预览文本颜色设置为主题颜色
         binding.tvPreview.setTextColor(primaryTextColor)
         binding.tvPatternError.setTextColor(requireContext().getColor(R.color.error))
@@ -371,7 +372,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
     private fun applyThemeColorRecursive(
         view: View,
         staticPrimary: Int,
-        staticSecondary: Int
+        staticSecondary: Int,
     ) {
         if (view is android.widget.TextView) {
             val currentColor = view.currentTextColor
@@ -388,7 +389,10 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
     }
 
     private fun makeCardDrawable(
-        fillColor: Int, strokeColor: Int, cornerDp: Float, density: Float
+        fillColor: Int,
+        strokeColor: Int,
+        cornerDp: Float,
+        density: Float,
     ) = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = cornerDp * density
@@ -397,7 +401,10 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
     }
 
     private fun makeInputDrawable(
-        fillColor: Int, strokeColor: Int, cornerDp: Float, density: Float
+        fillColor: Int,
+        strokeColor: Int,
+        cornerDp: Float,
+        density: Float,
     ) = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = cornerDp * density
@@ -444,12 +451,12 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
             else -> 0
         }
         binding.spThemeScope.setSelection(themePos)
-        
+
         updateColorPreview(binding.viewTextColorPreview, editingRule.textColor)
         updateColorPreview(binding.viewUnderlineColorPreview, editingRule.underlineColor)
         // 更新背景预览：如果有背景图片显示图片，否则显示颜色
         updateBgPreview()
-        
+
         updateSvgPathVisibility(editingRule.underlineMode)
         updateRegexToggle()
     }
@@ -565,7 +572,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                     parent: android.widget.AdapterView<*>?,
                     view: View?,
                     position: Int,
-                    id: Long
+                    id: Long,
                 ) {
                     editingRule.bgImageFit = position
                     updatePreview()
@@ -583,7 +590,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-            }
+            },
         )
         binding.spUnderlineMode.onItemSelectedListener =
             object : android.widget.AdapterView.OnItemSelectedListener {
@@ -591,7 +598,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                     parent: android.widget.AdapterView<*>?,
                     view: View?,
                     position: Int,
-                    id: Long
+                    id: Long,
                 ) {
                     editingRule.underlineMode = position
                     updateSvgPathVisibility(position)
@@ -606,7 +613,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                     parent: android.widget.AdapterView<*>?,
                     view: View?,
                     position: Int,
-                    id: Long
+                    id: Long,
                 ) {
                     editingRule.group = groupItems.getOrElse(position) { HighlightRuleGroupStore.DEFAULT_GROUP }
                 }
@@ -619,7 +626,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                     parent: android.widget.AdapterView<*>?,
                     view: View?,
                     position: Int,
-                    id: Long
+                    id: Long,
                 ) {
                     editingRule.targetScope = position.coerceIn(0, 2)
                     updatePreview()
@@ -663,7 +670,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                     parent: android.widget.AdapterView<*>?,
                     view: View?,
                     position: Int,
-                    id: Long
+                    id: Long,
                 ) {
                     editingRule.themeScope = when (position) {
                         1 -> HighlightRule.THEME_LIGHT
@@ -683,8 +690,11 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         } else {
             val names = layoutScopeVal.split(";").map { it.trim() }.filter { it.isNotBlank() }
             binding.etLayoutScope.setText(
-                if (names.size == 1) names[0]
-                else getString(R.string.highlight_rule_layout_scope_count, names.size)
+                if (names.size == 1) {
+                    names[0]
+                } else {
+                    getString(R.string.highlight_rule_layout_scope_count, names.size)
+                },
             )
         }
     }
@@ -699,7 +709,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                 ""
             } else {
                 editingRule.fontDisplayName()
-            }
+            },
         )
     }
 
@@ -718,7 +728,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                 R.string.explore_block_rule_regex_mode
             } else {
                 R.string.explore_block_rule_keyword_mode
-            }
+            },
         )
         if (isRegexMode) {
             binding.tvRegexToggle.setTextColor(accentColor)
@@ -899,7 +909,7 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
                 bgImageFit = binding.spBgImageFit.selectedItemPosition,
                 bgImageScale = (binding.sbBgImageScale.progress.coerceAtLeast(1) / 10f).coerceIn(0.1f, 5f),
                 font = editingRule.font?.takeIf { it.isNotBlank() },
-            )
+            ),
         )
     }
 
@@ -909,20 +919,16 @@ class HighlightRuleEditDialog @JvmOverloads constructor(
         return kotlin.runCatching { Regex(pattern) }.exceptionOrNull()?.localizedMessage
     }
 
-    private fun Float.formatScale(): String {
-        return if (this == this.toInt().toFloat()) {
-            this.toInt().toString()
-        } else {
-            String.format("%.1f", this)
-        }
+    private fun Float.formatScale(): String = if (this == this.toInt().toFloat()) {
+        this.toInt().toString()
+    } else {
+        String.format("%.1f", this)
     }
 
-    private fun Float.formatDistance(): String {
-        return if (this == this.toInt().toFloat()) {
-            this.toInt().toString()
-        } else {
-            String.format("%.1f", this)
-        }
+    private fun Float.formatDistance(): String = if (this == this.toInt().toFloat()) {
+        this.toInt().toString()
+    } else {
+        String.format("%.1f", this)
     }
 
     private fun parseColorOrNull(value: String): Int? {

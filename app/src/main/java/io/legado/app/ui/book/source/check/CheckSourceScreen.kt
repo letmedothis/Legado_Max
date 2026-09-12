@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,8 +55,7 @@ import io.legado.app.ui.theme.pageAccentColor
 import io.legado.app.ui.theme.pageMutedIconTint
 import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.theme.pageSurfaceVariantColor
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.utils.sendToClip
@@ -409,52 +407,22 @@ fun CheckSourceTopBar(
     onClearClick: () -> Unit,
     onConfigClick: () -> Unit
 ) {
-    val topBarColors = pageTopBarColors()
-    val (titleText, subtitleText) = when (uiState) {
-        is CheckSourceUIState.Idle -> "准备就绪" to "准备就绪"
-        is CheckSourceUIState.Checking -> "检测中..." to "检测中..."
-        is CheckSourceUIState.Paused -> "已暂停" to "已暂停"
-        is CheckSourceUIState.Completed -> "检测完成" to "检测完成"
+    val subtitleText = when (uiState) {
+        is CheckSourceUIState.Idle -> "准备就绪"
+        is CheckSourceUIState.Checking -> "检测中..."
+        is CheckSourceUIState.Paused -> "已暂停"
+        is CheckSourceUIState.Completed -> "检测完成"
     }
 
-    TopAppBar(
-        modifier = Modifier.pageTopBarBackground(topBarColors),
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent,
-            navigationIconContentColor = topBarColors.contentColor,
-            titleContentColor = topBarColors.contentColor,
-            actionIconContentColor = topBarColors.contentColor
-        ),
-        title = {
-            Column {
-                Text(
-                    text = stringResource(R.string.check_book_source),
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-                Text(
-                    text = subtitleText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = pageSecondaryTextColor()
-                )
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.back)
-                )
-            }
-        },
+    AppPageTopBar(
+        title = stringResource(R.string.check_book_source),
+        subtitle = subtitleText,
+        onBackClick = onBackClick,
         actions = {
             IconButton(onClick = onConfigClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "配置"
+                    contentDescription = stringResource(R.string.setting)
                 )
             }
             if (uiState is CheckSourceUIState.Checking) {

@@ -16,14 +16,11 @@ import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
 import splitties.views.onLongClick
 
-class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
-    BaseBooksAdapter<ViewBinding>(context) {
+class BooksAdapterGrid(context: Context, private val callBack: CallBack) : BaseBooksAdapter<ViewBinding>(context) {
     private val showBookname = AppConfig.showBookname
-    override fun getViewBinding(parent: ViewGroup): ViewBinding {
-        return when (showBookname) {
-            2 -> ItemBookshelfGrid2Binding.inflate(inflater, parent, false)
-            else -> ItemBookshelfGridBinding.inflate(inflater, parent, false)
-        }
+    override fun getViewBinding(parent: ViewGroup): ViewBinding = when (showBookname) {
+        2 -> ItemBookshelfGrid2Binding.inflate(inflater, parent, false)
+        else -> ItemBookshelfGridBinding.inflate(inflater, parent, false)
     }
 
     /**
@@ -40,7 +37,7 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
         holder: ItemViewHolder,
         binding: ViewBinding,
         item: BookShelfDisplay,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         when (binding) {
             is ItemBookshelfGridBinding -> binding.run {
@@ -93,7 +90,6 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                 }
             }
         }
-
     }
 
     private fun upRefresh(binding: ViewBinding, item: BookShelfDisplay) {

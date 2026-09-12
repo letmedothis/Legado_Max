@@ -1,1 +1,3 @@
 docs/archive/**
+# 自动生成的超长更新日志，不做 prettier 全量重排
+CHANGELOG.md

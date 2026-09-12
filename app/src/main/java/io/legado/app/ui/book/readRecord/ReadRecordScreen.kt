@@ -30,7 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
 import io.legado.app.data.entities.readRecord.ReadRecord
@@ -43,6 +42,7 @@ import io.legado.app.ui.book.readRecord.components.HeatmapMode
 import io.legado.app.ui.book.readRecord.components.SummaryCard
 import io.legado.app.ui.theme.pageTopBarBackground
 import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.swipe.SwipeActionContainer
@@ -239,38 +239,16 @@ fun ReadRecordScreen(
                     }
                 )
             } else {
-                TopAppBar(
-                    modifier = Modifier.pageTopBarBackground(topBarColors),
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                        navigationIconContentColor = topBarColors.contentColor,
-                        titleContentColor = topBarColors.contentColor,
-                        actionIconContentColor = topBarColors.contentColor
-                    ),
-                    title = {
-                        Column {
-                            Text(
-                                text = stringResource(R.string.read_record),
-                                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                            )
-                            Text(
-                                text = when (displayMode) {
-                                    DisplayMode.AGGREGATE -> stringResource(R.string.rr_aggregate_view)
-                                    DisplayMode.TIMELINE -> stringResource(R.string.rr_timeline_view)
-                                    DisplayMode.LATEST -> stringResource(R.string.rr_latest_read)
-                                    DisplayMode.READ_TIME -> stringResource(R.string.rr_read_duration)
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = topBarColors.contentColor
-                            )
-                        }
+                AppPageTopBar(
+                    title = stringResource(R.string.read_record),
+                    subtitle = when (displayMode) {
+                        DisplayMode.AGGREGATE -> stringResource(R.string.rr_aggregate_view)
+                        DisplayMode.TIMELINE -> stringResource(R.string.rr_timeline_view)
+                        DisplayMode.LATEST -> stringResource(R.string.rr_latest_read)
+                        DisplayMode.READ_TIME -> stringResource(R.string.rr_read_duration)
                     },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                        }
-                    },
+                    onBackClick = onBackClick,
+                    scrollBehavior = scrollBehavior,
                     actions = {
                         IconButton(onClick = { showSearch = !showSearch }) {
                             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
@@ -352,8 +330,7 @@ fun ReadRecordScreen(
                                 )
                             }
                         }
-                    },
-                    scrollBehavior = scrollBehavior
+                    }
                 )
             }
         },

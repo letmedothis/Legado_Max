@@ -21,7 +21,7 @@ object BackupSelectorConfig {
         val fileName: String,
         val title: String,
         val group: String,
-        val iconEmoji: String? = null // Emoji图标
+        val iconEmoji: String? = null, // Emoji图标
     )
 
     val allItems = listOf(
@@ -56,7 +56,7 @@ object BackupSelectorConfig {
         BackupItem("appConfig", "config.xml", "应用配置", "配置", "⚙️"),
         BackupItem("videoConfig", "videoConfig.xml", "视频配置", "配置", "🎬"),
         BackupItem("backgroundImages", "bg", "背景图片", "其他", "🌄"),
-        BackupItem("bookCache", "book_cache", "书籍缓存", "其他", "💾")
+        BackupItem("bookCache", "book_cache", "书籍缓存", "其他", "💾"),
     )
 
     val groups = allItems.map { it.group }.distinct()
@@ -77,16 +77,12 @@ object BackupSelectorConfig {
         return map
     }
 
-    fun isSelected(key: String): Boolean {
-        return selectedMap[key] ?: true
-    }
+    fun isSelected(key: String): Boolean = selectedMap[key] ?: true
 
-    fun getSelectedKeys(): Set<String> {
-        return allItems
-            .filter { isSelected(it.key) }
-            .map { it.key }
-            .toSet()
-    }
+    fun getSelectedKeys(): Set<String> = allItems
+        .filter { isSelected(it.key) }
+        .map { it.key }
+        .toSet()
 
     fun setSelected(key: String, selected: Boolean) {
         selectedMap[key] = selected
@@ -105,17 +101,11 @@ object BackupSelectorConfig {
         allItems.forEach { selectedMap[it.key] = false }
     }
 
-    fun getSelectedFileNames(): List<String> {
-        return allItems.filter { isSelected(it.key) }.map { it.fileName }
-    }
+    fun getSelectedFileNames(): List<String> = allItems.filter { isSelected(it.key) }.map { it.fileName }
 
-    fun isAllSelected(): Boolean {
-        return allItems.all { isSelected(it.key) }
-    }
+    fun isAllSelected(): Boolean = allItems.all { isSelected(it.key) }
 
-    fun isNoneSelected(): Boolean {
-        return allItems.none { isSelected(it.key) }
-    }
+    fun isNoneSelected(): Boolean = allItems.none { isSelected(it.key) }
 
     fun save() {
         val json = GSON.toJson(selectedMap.toMap())
@@ -125,12 +115,10 @@ object BackupSelectorConfig {
     /**
      * 获取分组的 Emoji 图标
      */
-    fun getGroupIcon(group: String): String? {
-        return when (group) {
-            "数据库" -> "📊"
-            "配置" -> "⚙️"
-            "其他" -> "📦"
-            else -> null
-        }
+    fun getGroupIcon(group: String): String? = when (group) {
+        "数据库" -> "📊"
+        "配置" -> "⚙️"
+        "其他" -> "📦"
+        else -> null
     }
 }

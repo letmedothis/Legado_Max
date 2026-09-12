@@ -23,21 +23,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.legado.app.R
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.toastOnUi
@@ -90,30 +86,11 @@ fun TimestampConvertScreen(
         result = formatTimestamp(now)
     }
 
-    // 页面骨架
-    val topBarColors = pageTopBarColors()
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Text(
-                        text = stringResource(R.string.debug_timestamp),
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
+            AppPageTopBar(
+                title = stringResource(R.string.debug_timestamp),
+                onBackClick = onBackClick
             )
         }
     ) { paddingValues ->

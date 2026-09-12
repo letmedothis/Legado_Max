@@ -87,6 +87,8 @@ viewpager2 = "1.0.0"
 #noinspection GradleDependency
 firebaseBom = "33.2.0"
 
+spotless = "7.0.2"
+
 [libraries]
 
 activity-activity = { module = "androidx.activity:activity", version.ref = "activity" }
@@ -278,3 +280,6 @@ room = { id = "androidx.room", version.ref = "room" }
 hilt = { id = "dagger.hilt.android.plugin", version.ref = "hilt" }
 
 download = { id = "de.undercouch.download", version = "5.6.0" }
+
+# Kotlin 代码格式检查（spotless + ktlint），见根 build.gradle 与 docs/project-rules/build-commands.md
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

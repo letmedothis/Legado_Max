@@ -24,8 +24,5 @@ interface BaseRssArticle : RuleDataInterface {
         RuleBigDataHelp.putRssVariable(origin, link, key, value)
     }
 
-    override fun getBigVariable(key: String): String? {
-        return RuleBigDataHelp.getRssVariable(origin, link, key)
-    }
-
+    override fun getBigVariable(key: String): String? = RuleBigDataHelp.getRssVariable(origin, link, key)
 }

@@ -36,6 +36,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
+import io.legado.app.ui.book.source.usedapi.SourceUsedApiActivity
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
@@ -143,12 +144,30 @@ class BookSourceEditActivity :
         viewModel.initData(intent) {
             initialSource = viewModel.bookSource
             upSourceView(viewModel.bookSource)
-            // 处理从源内容查询界面跳转来的定位请求
-            val tabKey = intent.getStringExtra("tabKey")
-            val fieldKey = intent.getStringExtra("fieldKey")
-            if (!tabKey.isNullOrBlank() && !fieldKey.isNullOrBlank()) {
-                scrollToField(tabKey, fieldKey)
-            }
+            // 处理从源内容查询界面/「源所用API」跳转来的字段定位请求
+            locateFieldFromIntent(intent)
+        }
+    }
+
+    /**
+     * 处理带 tabKey + fieldKey 的定位请求：切换到对应 tab 并聚焦字段输入框。
+     */
+    private fun locateFieldFromIntent(intent: Intent) {
+        val tabKey = intent.getStringExtra("tabKey")
+        val fieldKey = intent.getStringExtra("fieldKey")
+        if (!tabKey.isNullOrBlank() && !fieldKey.isNullOrBlank()) {
+            scrollToField(tabKey, fieldKey)
+        }
+    }
+
+    /**
+     * singleTask 复用已有实例时也会收到新 Intent，需重新读取定位参数并跳转。
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (viewModel.bookSource != null) {
+            locateFieldFromIntent(intent)
         }
     }
 
@@ -396,6 +415,12 @@ class BookSourceEditActivity :
             R.id.menu_debug_source -> saveSource(getSource()) { source ->
                 startActivity<BookSourceDebugActivity> {
                     putExtra("key", source.bookSourceUrl)
+                }
+            }
+
+            R.id.menu_used_api -> saveSource(getSource()) { source ->
+                startActivity<SourceUsedApiActivity> {
+                    putExtra("sourceUrl", source.bookSourceUrl)
                 }
             }
 

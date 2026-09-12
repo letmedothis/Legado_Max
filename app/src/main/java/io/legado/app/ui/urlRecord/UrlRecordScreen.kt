@@ -43,19 +43,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import io.legado.app.R
 import io.legado.app.data.entities.UrlRecord
 import io.legado.app.ui.theme.pageCardContainerColor
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
@@ -86,7 +86,6 @@ fun UrlRecordScreen(
     
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val containerColor = pageCardContainerColor()
-    val topBarColors = pageTopBarColors()
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -124,38 +123,14 @@ fun UrlRecordScreen(
 
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Column {
-                        Text(
-                            text = "URL访问记录",
-                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                        )
-                        if (recordCount > 0) {
-                            Text(
-                                text = "共 $recordCount 条记录",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.url_record),
+                subtitle = if (recordCount > 0) stringResource(R.string.url_record_count, recordCount) else null,
+                onBackClick = onBackClick,
+                scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = { showSearch = !showSearch }) {
-                        Icon(Icons.Default.Search, contentDescription = "搜索")
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
                     }
                     IconButton(onClick = { showFilterPanel = !showFilterPanel }) {
                         val hasFilters = viewModel.hasActiveFilters()
@@ -168,12 +143,12 @@ fun UrlRecordScreen(
                                 }
                             }
                         ) {
-                            Icon(Icons.Default.FilterList, contentDescription = "筛选")
+                            Icon(Icons.Default.FilterList, contentDescription = stringResource(R.string.filter))
                         }
                     }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
                         }
                         DropdownMenu(
                             expanded = showMenu,
@@ -251,8 +226,7 @@ fun UrlRecordScreen(
                             )
                         }
                     }
-                },
-                scrollBehavior = scrollBehavior
+                }
             )
         }
     ) { paddingValues ->

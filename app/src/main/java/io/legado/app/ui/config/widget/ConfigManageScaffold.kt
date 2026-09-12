@@ -2,23 +2,10 @@ package io.legado.app.ui.config.widget
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import io.legado.app.R
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 
 /**
@@ -47,41 +34,16 @@ fun ConfigManageScaffold(
     bottomBar: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
 ) {
-    val topBarColors = pageTopBarColors()
-
     AppScaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Text(
-                        text = title,
-                        style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (isMultiSelectMode) {
-                            onExitMultiSelect()
-                        } else {
-                            onBackClick()
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back)
-                        )
+            AppPageTopBar(
+                title = title,
+                onBackClick = {
+                    if (isMultiSelectMode) {
+                        onExitMultiSelect()
+                    } else {
+                        onBackClick()
                     }
                 },
                 actions = actions

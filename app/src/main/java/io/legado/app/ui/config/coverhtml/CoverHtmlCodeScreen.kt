@@ -37,6 +37,7 @@ import io.legado.app.model.BookCover
 import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.addHtmlPattern
 import io.legado.app.ui.widget.code.addJsPattern
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
 import io.legado.app.ui.widget.image.CoverImageView
@@ -65,9 +66,8 @@ fun CoverHtmlCodeScreen(
     onBackClick: () -> Unit,
     onShowTemplateList: () -> Unit
 ) {
-    val context = LocalContext.current
-    val containerColor = coverHtmlCardContainerColor()
-    val topBarColor = coverHtmlTopBarContainerColor()
+val context = LocalContext.current
+val containerColor = coverHtmlCardContainerColor()
     
     //region 状态管理
     /** 模板名称 */
@@ -214,29 +214,14 @@ fun CoverHtmlCodeScreen(
     //region UI布局
     AppScaffold(
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = topBarColor,
-                    scrolledContainerColor = topBarColor,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                title = {
-                    Text(
-                        text = stringResource(R.string.cover_html_code),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.cover_html_code),
+                onBackClick = onBackClick,
+                backIcon = Icons.Default.Close,
+                backContentDescription = stringResource(R.string.close),
                 actions = {
                     IconButton(onClick = onShowTemplateList) {
-                        Icon(Icons.Default.Sort, contentDescription = "模板列表")
+                        Icon(Icons.Default.Sort, contentDescription = stringResource(R.string.cover_html_template))
                     }
                 }
             )

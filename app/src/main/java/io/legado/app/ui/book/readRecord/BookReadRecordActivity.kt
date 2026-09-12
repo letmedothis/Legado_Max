@@ -26,7 +26,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MenuBook
@@ -36,8 +35,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,24 +44,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.base.BaseComposeActivity
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.entities.readRecord.ReadRecordTimelineDay
 import io.legado.app.data.repository.ReadRecordRepository
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import io.legado.app.R
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.utils.formatReadDuration
@@ -118,34 +113,11 @@ fun BookReadRecordScreen(
         .value
 
     val totalSessionCount = timelineDays.sumOf { it.sessions.size }
-    val topBarColors = pageTopBarColors()
-
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                title = {
-                    Text(
-                        text = bookName,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                )
+            AppPageTopBar(
+                title = bookName,
+                onBackClick = onBackClick
             )
         }
     ) { padding ->
@@ -217,8 +189,7 @@ fun BookReadRecordScreen(
                         key = { it.date }
                     ) { day ->
                         DaySection(
-                            date = day.date,
-                            sessions = day.sessions
+                            day = day
                         )
                     }
                 }
@@ -289,14 +260,16 @@ private fun StatChip(
 
 @Composable
 private fun DaySection(
-    date: String,
-    sessions: List<ReadRecordSession>
+    day: ReadRecordTimelineDay
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val sessions = day.sessions
+    val date = day.date
     val sessionCount = sessions.size
-    val totalDuration = sessions.sumOf { (it.endTime - it.startTime).coerceAtLeast(0L) }
+    // 日合计用当天真实阅读时长（未合并会话之和）；合并后的展示时段端点跨度包含暂停间隙，不能直接求和
+    val totalDuration = day.readTime
 
     Column(
         modifier = Modifier
@@ -349,9 +322,9 @@ private fun DaySection(
                 modifier = Modifier.padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                sessions.forEach { session ->
-                    val duration = (session.endTime - session.startTime).coerceAtLeast(0L)
-                    SessionRow(session, timeFormat, duration)
+                sessions.forEach { item ->
+                    // 行时长用该时段内的真实阅读时长（不含合并间隙），保证行时长之和等于日合计
+                    SessionRow(item.session, timeFormat, item.readTime)
                 }
             }
         }

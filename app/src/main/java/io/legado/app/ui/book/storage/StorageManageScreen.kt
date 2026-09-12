@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +52,7 @@ import io.legado.app.ui.widget.components.navigationBarBottomInset
 //   - LazyColumn 渲染缓存汇总卡片和缓存项列表
 //   - 管理清理确认对话框的显示（由 ViewModel 状态驱动，§4.5）
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StorageManageScreen(
     viewModel: StorageManageViewModel,

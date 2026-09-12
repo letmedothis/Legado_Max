@@ -36,10 +36,7 @@ interface RuleDataInterface {
 
     fun putBigVariable(key: String, value: String?)
 
-    fun getVariable(key: String): String {
-        return variableMap[key] ?: getBigVariable(key) ?: ""
-    }
+    fun getVariable(key: String): String = variableMap[key] ?: getBigVariable(key) ?: ""
 
     fun getBigVariable(key: String): String?
-
 }

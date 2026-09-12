@@ -64,7 +64,7 @@ fun ThemeEditDialog(
     onSelectImage: () -> Unit,
     onUpdateDraft: ((ThemeConfig.Config) -> ThemeConfig.Config) -> Unit,
     onColorClick: (colorKey: String, currentColor: String) -> Unit = { _, _ -> },
-    onBlurClick: (currentBlur: Int) -> Unit = {}
+    onBlurClick: (currentBlur: Int) -> Unit = {},
 ) {
     val config = draft ?: return
 
@@ -73,7 +73,7 @@ fun ThemeEditDialog(
         title = {
             Text(
                 text = if (isNew) stringResource(R.string.add_theme) else stringResource(R.string.edit_theme),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
         },
         text = {
@@ -81,7 +81,7 @@ fun ThemeEditDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 // 主题名称
                 OutlinedTextField(
@@ -91,7 +91,7 @@ fun ThemeEditDialog(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
+                        .padding(bottom = 8.dp),
                 )
 
                 // 主色调
@@ -99,7 +99,7 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.primary),
                     hexColor = config.primaryColor,
                     isAccent = false,
-                    onClick = { onColorClick("primaryColor", config.primaryColor) }
+                    onClick = { onColorClick("primaryColor", config.primaryColor) },
                 )
 
                 // 强调色
@@ -107,7 +107,7 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.accent_color),
                     hexColor = config.accentColor,
                     isAccent = true,
-                    onClick = { onColorClick("accentColor", config.accentColor) }
+                    onClick = { onColorClick("accentColor", config.accentColor) },
                 )
 
                 // 背景色
@@ -115,7 +115,7 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.background_color),
                     hexColor = config.backgroundColor,
                     isAccent = false,
-                    onClick = { onColorClick("backgroundColor", config.backgroundColor) }
+                    onClick = { onColorClick("backgroundColor", config.backgroundColor) },
                 )
 
                 // 底栏背景色
@@ -123,7 +123,7 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.bottom_background_color),
                     hexColor = config.bottomBackground,
                     isAccent = false,
-                    onClick = { onColorClick("bottomBackground", config.bottomBackground) }
+                    onClick = { onColorClick("bottomBackground", config.bottomBackground) },
                 )
 
                 // 导航栏颜色透明
@@ -131,7 +131,7 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.top_bar_transparent),
                     subtitle = stringResource(R.string.top_bar_transparent_hint),
                     checked = config.transparentNavBar,
-                    onCheckedChange = { checked -> onUpdateDraft { cfg -> cfg.copy(transparentNavBar = checked) } }
+                    onCheckedChange = { checked -> onUpdateDraft { cfg -> cfg.copy(transparentNavBar = checked) } },
                 )
 
                 // 背景图片
@@ -139,14 +139,14 @@ fun ThemeEditDialog(
                     title = stringResource(R.string.background_image),
                     path = config.backgroundImgPath,
                     onClick = onSelectImage,
-                    onClear = { onUpdateDraft { cfg -> cfg.copy(backgroundImgPath = null, backgroundImgBlur = 0) } }
+                    onClear = { onUpdateDraft { cfg -> cfg.copy(backgroundImgPath = null, backgroundImgBlur = 0) } },
                 )
 
                 // 背景图片虚化
                 OptionRow(
                     title = stringResource(R.string.background_image_blurring),
                     value = "${config.backgroundImgBlur}",
-                    onClick = { onBlurClick(config.backgroundImgBlur) }
+                    onClick = { onBlurClick(config.backgroundImgBlur) },
                 )
             }
         },
@@ -159,7 +159,7 @@ fun ThemeEditDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
-        }
+        },
     )
 }
 
@@ -172,7 +172,7 @@ private fun ColorRow(
     title: String,
     hexColor: String,
     isAccent: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val currentColor = remember(hexColor) {
         runCatching { Color(hexColor.toColorInt()) }.getOrDefault(Color.Gray)
@@ -187,19 +187,19 @@ private fun ColorRow(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 15.sp,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
 
             Text(
@@ -209,7 +209,7 @@ private fun ColorRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.width(100.dp)
+                modifier = Modifier.width(100.dp),
             )
 
             Spacer(Modifier.width(10.dp))
@@ -219,10 +219,10 @@ private fun ColorRow(
                 modifier = Modifier
                     .size(
                         width = if (isAccent) 36.dp else 28.dp,
-                        height = if (isAccent) 28.dp else 22.dp
+                        height = if (isAccent) 28.dp else 22.dp,
                     )
                     .clip(RoundedCornerShape(5.dp))
-                    .background(currentColor)
+                    .background(currentColor),
             )
         }
     }
@@ -235,7 +235,7 @@ private fun ColorRow(
 private fun OptionRow(
     title: String,
     value: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -245,19 +245,19 @@ private fun OptionRow(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 15.sp,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
 
             Text(
@@ -266,7 +266,7 @@ private fun OptionRow(
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis
+                overflow = TextOverflow.MiddleEllipsis,
             )
         }
     }
@@ -282,7 +282,7 @@ private fun BackgroundImageRow(
     title: String,
     path: String?,
     onClick: () -> Unit,
-    onClear: () -> Unit
+    onClear: () -> Unit,
 ) {
     // 在 IO 线程异步解码缩略图，避免阻塞主线程；解码失败或未选图时置空显示占位块
     val thumbnail: ImageBitmap? by produceState<ImageBitmap?>(initialValue = null, path) {
@@ -309,19 +309,19 @@ private fun BackgroundImageRow(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontSize = 15.sp,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
 
             // 缩略图预览：解码成功显示图片，否则显示灰色占位块
@@ -330,7 +330,7 @@ private fun BackgroundImageRow(
                     .size(width = 48.dp, height = 40.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 thumbnail?.let { image ->
                     Image(
@@ -339,7 +339,7 @@ private fun BackgroundImageRow(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(4.dp)),
                     )
                 }
             }
@@ -353,7 +353,7 @@ private fun BackgroundImageRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.MiddleEllipsis,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
 
             if (path != null) {
@@ -366,7 +366,7 @@ private fun BackgroundImageRow(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .clickable(onClick = onClear)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
         }
@@ -381,7 +381,7 @@ private fun SwitchRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    subtitle: String? = null
+    subtitle: String? = null,
 ) {
     Surface(
         modifier = Modifier
@@ -390,33 +390,33 @@ private fun SwitchRow(
             .clip(RoundedCornerShape(8.dp)),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontSize = 15.sp
+                    fontSize = 15.sp,
                 )
                 if (subtitle != null) {
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
             )
         }
     }
@@ -438,7 +438,7 @@ private fun ThemeEditDialogPreview() {
                 bottomBackground = "#FF424242",
                 transparentNavBar = true,
                 backgroundImgPath = null,
-                backgroundImgBlur = 0
+                backgroundImgBlur = 0,
             ),
             isNew = false,
             onDismiss = {},
@@ -446,7 +446,7 @@ private fun ThemeEditDialogPreview() {
             onSelectImage = {},
             onUpdateDraft = {},
             onColorClick = { _, _ -> },
-            onBlurClick = {}
+            onBlurClick = {},
         )
     }
 }
@@ -465,7 +465,7 @@ private fun ThemeEditDialogNewPreview() {
                 bottomBackground = "#FF0F3460",
                 transparentNavBar = false,
                 backgroundImgPath = null,
-                backgroundImgBlur = 50
+                backgroundImgBlur = 50,
             ),
             isNew = true,
             onDismiss = {},
@@ -473,7 +473,7 @@ private fun ThemeEditDialogNewPreview() {
             onSelectImage = {},
             onUpdateDraft = {},
             onColorClick = { _, _ -> },
-            onBlurClick = {}
+            onBlurClick = {},
         )
     }
 }

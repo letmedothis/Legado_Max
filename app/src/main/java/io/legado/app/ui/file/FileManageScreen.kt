@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +43,7 @@ import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
  * - 搜索过滤文件
  * - 点击文件可打开，长按可删除
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileManageScreen(
     viewModel: FileManageViewModel,

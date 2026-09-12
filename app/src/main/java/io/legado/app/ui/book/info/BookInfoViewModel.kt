@@ -117,14 +117,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 upBook(book)
                 return@execute
             }
-            
+
             // 如果前面的查找都失败，但是有bookUrl，创建临时书籍对象
             if (bookUrl.isNotBlank() && name.isNotBlank()) {
                 val tempBook = Book(
                     bookUrl = bookUrl,
                     name = name,
                     author = author,
-                    origin = intent.getStringExtra("origin") ?: ""
+                    origin = intent.getStringExtra("origin") ?: "",
                 ).apply {
                     // 从搜索记录中获取更多信息
                     appDb.searchBookDao.getSearchBook(bookUrl)?.let { searchBook ->
@@ -139,7 +139,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 upBook(tempBook)
                 return@execute
             }
-            
+
             throw NoStackTraceException("未找到书籍")
         }.onError {
             AppLog.put(it.localizedMessage, it)
@@ -160,10 +160,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     private fun upBook(book: Book) {
         execute {
-            bookSource = if (book.isLocal) null else
+            bookSource = if (book.isLocal) {
+                null
+            } else {
                 appDb.bookSourceDao.getBookSource(book.origin)?.also {
                     hasCustomBtn = it.customButton
                 }
+            }
             bookData.postValue(book)
             upCoverByRule(book)
             if (book.tocUrl.isEmpty() && !book.isLocal) {
@@ -238,7 +241,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         book: Book,
         canReName: Boolean = true,
         runPreUpdateJs: Boolean = true,
-        scope: CoroutineScope = viewModelScope
+        scope: CoroutineScope = viewModelScope,
     ) {
         if (book.isLocal) {
             LocalBook.upBookInfo(book)
@@ -254,28 +257,28 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
                     try {
-                    AppLog.putReaderDebug("[TOC] loadBookInfo成功: bookUrl=${book.bookUrl}, isWebFile=${it.isWebFile}, tocUrl=${it.tocUrl}")
-                    val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
-                        dbBook.updateTo(it)
-                        inBookshelf = true
-                    }
-                    bookData.postValue(it)
-                    if (inBookshelf) {
-                        it.save()
-                    }
-                    if (it.isWebFile) {
-                        AppLog.putReaderDebug("[TOC] loadBookInfo: isWebFile=true, 走loadWebFile分支")
-                        loadWebFile(it)
-                    } else {
-                        AppLog.putReaderDebug("[TOC] loadBookInfo: 即将调用loadChapter, isLocal=${it.isLocal}, bookSource=${bookSource != null}")
-                        try {
-                            loadChapter(it, runPreUpdateJs, isFromBookInfo = true)
-                            AppLog.putReaderDebug("[TOC] loadChapter调用完成")
-                        } catch (e: Throwable) {
-                            AppLog.putReaderDebug("[TOC] loadChapter调用异常: ${e.localizedMessage}", e)
+                        AppLog.putReaderDebug("[TOC] loadBookInfo成功: bookUrl=${book.bookUrl}, isWebFile=${it.isWebFile}, tocUrl=${it.tocUrl}")
+                        val dbBook = appDb.bookDao.getBook(book.name, book.author)
+                        if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
+                            dbBook.updateTo(it)
+                            inBookshelf = true
                         }
-                    }
+                        bookData.postValue(it)
+                        if (inBookshelf) {
+                            it.save()
+                        }
+                        if (it.isWebFile) {
+                            AppLog.putReaderDebug("[TOC] loadBookInfo: isWebFile=true, 走loadWebFile分支")
+                            loadWebFile(it)
+                        } else {
+                            AppLog.putReaderDebug("[TOC] loadBookInfo: 即将调用loadChapter, isLocal=${it.isLocal}, bookSource=${bookSource != null}")
+                            try {
+                                loadChapter(it, runPreUpdateJs, isFromBookInfo = true)
+                                AppLog.putReaderDebug("[TOC] loadChapter调用完成")
+                            } catch (e: Throwable) {
+                                AppLog.putReaderDebug("[TOC] loadChapter调用异常: ${e.localizedMessage}", e)
+                            }
+                        }
                     } catch (e: Throwable) {
                         AppLog.putReaderDebug("[TOC] loadBookInfo onSuccess异常: ${e.localizedMessage}", e)
                     }
@@ -290,7 +293,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         book: Book,
         runPreUpdateJs: Boolean = true,
         scope: CoroutineScope = viewModelScope,
-        isFromBookInfo: Boolean = false
+        isFromBookInfo: Boolean = false,
     ) {
         AppLog.putReaderDebug("[TOC] loadChapter入口A")
         AppLog.putReaderDebug("[TOC] loadChapter入口B: bookUrl=" + book.bookUrl)
@@ -390,7 +393,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     private fun updatePartialBookChapterSummary(
         book: Book,
         chapters: List<BookChapter>,
-        baseTotalChapterNum: Int
+        baseTotalChapterNum: Int,
     ) {
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
         val replaceBook = book.toReplaceBook()
@@ -399,7 +402,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             book.durChapterTitle = currentChapter?.getDisplayTitle(
                 replaceRules,
                 book.getUseReplaceRule(),
-                replaceBook = replaceBook
+                replaceBook = replaceBook,
             )
         }
         if (baseTotalChapterNum < chapters.size) {
@@ -412,14 +415,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             .getDisplayTitle(
                 replaceRules,
                 book.getUseReplaceRule(),
-                replaceBook = replaceBook
+                replaceBook = replaceBook,
             )
     }
 
     private fun saveShelfBook(
         oldBook: Book,
         book: Book,
-        removeUpdateError: Boolean = false
+        removeUpdateError: Boolean = false,
     ) {
         book.sync(oldBook)
         if (removeUpdateError) {
@@ -442,7 +445,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
     }
 
-
     fun loadGroup(groupId: Long, success: ((groupNames: String?) -> Unit)) {
         execute {
             appDb.bookGroupDao.getGroupNames(groupId).joinToString(",")
@@ -454,17 +456,21 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     private fun loadWebFile(book: Book) {
         execute {
             webFiles.clear()
-            val fileNameNoExtension = if (book.author.isBlank()) book.name
-            else "${book.name} 作者：${book.author}"
+            val fileNameNoExtension = if (book.author.isBlank()) {
+                book.name
+            } else {
+                "${book.name} 作者：${book.author}"
+            }
             book.downloadUrls!!.map {
                 val analyzeUrl = AnalyzeUrl(
-                    it, source = bookSource,
-                    coroutineContext = coroutineContext
+                    it,
+                    source = bookSource,
+                    coroutineContext = coroutineContext,
                 )
                 var mFileName = UrlUtil.getFileName(analyzeUrl)
                     ?: fileNameNoExtension
                 analyzeUrl.type?.let { suffix ->
-                    mFileName += ".${suffix}"
+                    mFileName += ".$suffix"
                 }
                 WebFile(it, mFileName)
             }
@@ -487,14 +493,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 val book = LocalBook.importFileOnLine(
                     webFile.url,
                     bookData.value!!.getExportFileName(webFile.suffix),
-                    bookSource
+                    bookSource,
                 )
                 changeToLocalBook(book)
             } else {
                 LocalBook.saveBookFile(
                     webFile.url,
                     bookData.value!!.getExportFileName(webFile.suffix),
-                    bookSource
+                    bookSource,
                 )
             }
         }.onSuccess {
@@ -530,13 +536,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     fun importArchiveBook(
         archiveFileUri: Uri,
         archiveEntryName: String,
-        success: ((Book) -> Unit)? = null
+        success: ((Book) -> Unit)? = null,
     ) {
         execute {
             val suffix = archiveEntryName.substringAfterLast(".")
             LocalBook.importArchiveFile(
                 archiveFileUri,
-                bookData.value!!.getExportFileName(suffix)
+                bookData.value!!.getExportFileName(suffix),
             ) {
                 it.contains(archiveEntryName)
             }.first()
@@ -641,9 +647,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun addToBookshelf(success: (() -> Unit)?, groupId: Long? = null) { //点击书架按钮或在加分组时触发
+    fun addToBookshelf(success: (() -> Unit)?, groupId: Long? = null) { // 点击书架按钮或在加分组时触发
         execute {
-            inBookshelf = true //尽早设置，防止loadChapter并发重新添加notShelf标记
+            inBookshelf = true // 尽早设置，防止loadChapter并发重新添加notShelf标记
             bookData.value?.let { book ->
                 book.removeType(BookType.notShelf)
                 if (groupId != null) {
@@ -674,7 +680,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 appDb.bookChapterDao.insert(*it.toTypedArray())
             }
         }.onError {
-            inBookshelf = false //保存失败时回滚状态，避免UI与数据库不一致
+            inBookshelf = false // 保存失败时回滚状态，避免UI与数据库不一致
             AppLog.put("加入书架失败: ${it.localizedMessage}", it)
         }.onSuccess {
             success?.invoke()
@@ -692,7 +698,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     fun delBook(
         deleteOriginal: Boolean = false,
         clearSearchBooks: Boolean = true,
-        success: (() -> Unit)? = null
+        success: (() -> Unit)? = null,
     ) {
         execute {
             bookData.value?.let { book ->
@@ -735,13 +741,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private fun changeToLocalBook(localBook: Book): Book {
-        return LocalBook.mergeBook(localBook, bookData.value).let {
-            bookData.postValue(it)
-            loadChapter(it)
-            inBookshelf = true
-            it
-        }
+    private fun changeToLocalBook(localBook: Book): Book = LocalBook.mergeBook(localBook, bookData.value).let {
+        bookData.postValue(it)
+        loadChapter(it)
+        inBookshelf = true
+        it
     }
 
     fun onButtonClick(activity: AppCompatActivity, name: String, click: String) {
@@ -767,9 +771,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         val name: String,
     ) {
 
-        override fun toString(): String {
-            return name
-        }
+        override fun toString(): String = name
 
         // 后缀
         val suffix: String = UrlUtil.getSuffix(name)
@@ -779,7 +781,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
         // 压缩包形式的txt epub umd pdf文件
         val isSupportDecompress: Boolean = AppPattern.archiveFileRegex.matches(name)
-
     }
 
     // 作者其他作品相关方法
@@ -831,7 +832,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 page = 1,
                 filter = { _, itemAuthor, _ ->
                     normalizeAuthor(itemAuthor) == author
-                }
+                },
             ).onEach {
                 it.releaseHtmlData()
             }.let { filterAuthorOtherWorks(book, it) }
@@ -841,12 +842,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             items
         }.onSuccess {
             authorOtherWorksData.postValue(
-                if (it.isEmpty()) AuthorOtherWorksState.Empty else AuthorOtherWorksState.Success(it)
+                if (it.isEmpty()) AuthorOtherWorksState.Empty else AuthorOtherWorksState.Success(it),
             )
         }.onError {
             AppLog.put("搜索作者其他作品失败\n${it.localizedMessage}", it)
             authorOtherWorksData.postValue(
-                AuthorOtherWorksState.Error(it.localizedMessage ?: it.javaClass.simpleName)
+                AuthorOtherWorksState.Error(it.localizedMessage ?: it.javaClass.simpleName),
             )
         }
     }
@@ -861,13 +862,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private fun normalizeAuthor(author: String): String {
-        return author.trim()
-    }
+    private fun normalizeAuthor(author: String): String = author.trim()
 
-    fun getBookShelfState(book: SearchBook): BookShelfState {
-        return BookshelfMatcher.getState(book.name, book.author, book.bookUrl)
-    }
+    fun getBookShelfState(book: SearchBook): BookShelfState = BookshelfMatcher.getState(book.name, book.author, book.bookUrl)
 
     /**
      * 将作者其他作品中的书籍加入书架
@@ -889,6 +886,4 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         data class Success(val books: List<SearchBook>) : AuthorOtherWorksState()
         data class Error(val message: String) : AuthorOtherWorksState()
     }
-
 }
-

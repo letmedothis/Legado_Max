@@ -40,8 +40,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,8 +51,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.debug.DebugCategory
@@ -79,9 +79,8 @@ import io.legado.app.ui.theme.pageCardElevatedContainerColor
 import io.legado.app.ui.theme.pageHeaderContainerColor
 import io.legado.app.ui.theme.pageMutedIconTint
 import io.legado.app.ui.theme.pageSecondaryTextColor
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
 import io.legado.app.ui.debuglog.viewmodel.DebugLogViewModel
+import io.legado.app.ui.widget.components.AppPageTopBar
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.share
@@ -130,7 +129,6 @@ fun DebugLogScreen(
     val selectedRssSourceUrl by viewModel.selectedRssSourceUrl.collectAsState()
     val rssExecutionRecords by viewModel.rssExecutionRecords.collectAsState()
     val rssRuleRecords by viewModel.rssRuleRecords.collectAsState()
-    val topBarColors = pageTopBarColors()
     val cardColor = pageCardElevatedContainerColor()
     val secondaryTextColor = pageSecondaryTextColor()
     val mutedIconTint = pageMutedIconTint()
@@ -157,24 +155,11 @@ fun DebugLogScreen(
         topBar = {
             Column {
                 // 顶部工具栏
-                TopAppBar(
-                    modifier = Modifier.pageTopBarBackground(topBarColors),
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                        navigationIconContentColor = topBarColors.contentColor,
-                        titleContentColor = topBarColors.contentColor,
-                        actionIconContentColor = topBarColors.contentColor
-                    ),
-                    title = { Text("调试日志") },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "关闭"
-                            )
-                        }
-                    },
+                AppPageTopBar(
+                    title = stringResource(R.string.debug_log),
+                    backIcon = Icons.Default.Close,
+                    backContentDescription = stringResource(R.string.close),
+                    onBackClick = onDismiss,
                     actions = {
                         // 刷新按钮：手动刷新日志列表
                         IconButton(onClick = {
@@ -184,21 +169,21 @@ fun DebugLogScreen(
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "刷新"
+                                contentDescription = stringResource(R.string.refresh)
                             )
                         }
                         // 搜索按钮：切换搜索框显示
                         IconButton(onClick = { showSearch = !showSearch }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "搜索"
+                                contentDescription = stringResource(R.string.search)
                             )
                         }
                         // 暂停/继续按钮：控制日志采集
                         IconButton(onClick = { viewModel.togglePause() }) {
                             Icon(
                                 imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                contentDescription = if (isPaused) "继续" else "暂停"
+                                contentDescription = if (isPaused) stringResource(R.string.resume) else stringResource(R.string.pause)
                             )
                         }
 
@@ -206,7 +191,7 @@ fun DebugLogScreen(
                         IconButton(onClick = { viewModel.clearLogs() }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "清空",
+                                contentDescription = stringResource(R.string.clear),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -217,7 +202,7 @@ fun DebugLogScreen(
                             IconButton(onClick = { showOverflowMenu = true }) {
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "更多"
+                                    contentDescription = stringResource(R.string.more)
                                 )
                             }
                             DropdownMenu(
@@ -226,7 +211,7 @@ fun DebugLogScreen(
                                 containerColor = cardColor
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("导出日志") },
+                                    text = { Text(stringResource(R.string.export_log)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         val exportedText = viewModel.exportFilteredLogs()
@@ -239,7 +224,7 @@ fun DebugLogScreen(
                                 )
 
                                 DropdownMenuItem(
-                                    text = { Text("调试工具") },
+                                    text = { Text(stringResource(R.string.debug_tools)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         context.startActivity(
@@ -253,7 +238,7 @@ fun DebugLogScreen(
                                 )
 
                                 DropdownMenuItem(
-                                    text = { Text("精准管理") },
+                                    text = { Text(stringResource(R.string.precise_manage)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         val intent = Intent(context, ConfigActivity::class.java)
@@ -267,7 +252,7 @@ fun DebugLogScreen(
                                 )
 
                                 DropdownMenuItem(
-                                    text = { Text("其他设置") },
+                                    text = { Text(stringResource(R.string.other_settings)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         val intent = Intent(context, ConfigActivity::class.java)

@@ -241,12 +241,14 @@
         <!-- 配置界面 -->
         <activity
             android:name=".ui.config.ConfigActivity"
+            android:configChanges="uiMode"
             android:launchMode="standard" />
         <activity
             android:name=".ui.config.NavigationBarManageActivity"
             android:launchMode="standard" />
         <activity
             android:name=".ui.config.theme.manage.ThemeManageActivity"
+            android:configChanges="uiMode"
             android:launchMode="standard" />
         <activity
             android:name=".ui.config.theme.legacy.appTheme.ApplicationThemeActivity"
@@ -423,6 +425,11 @@
         <!-- 书源检测 -->
         <activity
             android:name=".ui.book.source.check.CheckSourceActivity"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true" />
+        <!-- 源所用API -->
+        <activity
+            android:name=".ui.book.source.usedapi.SourceUsedApiActivity"
             android:configChanges="orientation|screenSize"
             android:hardwareAccelerated="true" />
         <!-- HTML封面模板配置 -->

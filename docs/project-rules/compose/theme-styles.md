@@ -5,7 +5,7 @@
 > 同目录全套：`structure.md`（§1/2/3/11/12）、`state-events.md`（§4/5/6）、`performance.md`（§8）、`navigation-preview.md`（§9/10）、`accessibility.md`（§15）、`testing.md`（§16）、`migration-review.md`（§13/14/17）。
 > **执行方式**：§14（见 `migration-review.md`）中标 [机器] 的项由 lint/Detekt/CI 规则强制，违规直接构建失败；[人工] 项 Code Review 时人工对照，不达标 PR 打回
 > **老代码策略**：分阶段迁移，允许 `@Suppress("LegadoUiViolation")` + TODO 临时过渡（见 `migration-review.md` §13）
-> **最后更新**：2026-08-19
+> **最后更新**：2026-09-10
 
 ---
 
@@ -159,5 +159,31 @@ TopAppBar(
 - **书籍阅读页**（`ui/book/read/ReadMenu.kt`）：`view_read_menu.xml` 中 TitleBar 声明 `skipTopBarConfig="true"`。immersive 菜单顶栏跟随**阅读页背景色**（`ReadBookConfig.durConfig.curBgStr()`），非 immersive 用 `primaryColor`——跟随阅读主题是有意为之。
 
 > 若确有需求要统一这两处（如"阅读页也想用全局顶栏壁纸"），需作为独立需求评审，禁止顺手改。
+
+### 7.8 主题切换与页面重建
+
+> 背景（完整证据链见 `docs/archive/主题列表应用主题后UI卡死根因分析.md` §15，2026-09-10 模拟器实测）：
+> 日夜主题切换经 `AppCompatDelegate.setDefaultNightMode` 会触发 AppCompat **系统级再启动**（ActivityThread 直接重建新实例），
+> 在此路径及 `Activity.recreate()` 原地重建路径下，重建出的 Compose 实例存在可达缺陷：**首帧组合正常，随后 snapshot 状态写入不再驱动重组/重绘**——
+> 输入与 clickable 回调正常（`switchTab` 已执行）、`LaunchedEffect` 不重启、连 pointer 驱动的列表滚动都零帧；`Snapshot.sendApplyNotifications()` + `view.invalidate()` 手动唤醒均无效。
+> 而同一进程内全新 `startActivity` 的实例全链路健康。二者差异仅在于窗口的建立路径（原地重建 vs 全新启动）。
+
+本节为 Code Review 人工对照项：[人工] 不达标 PR 打回。
+
+#### 7.8.1 重建路径选择（强制）
+
+- **必须**：主题切换需要重建页面的，统一接管 `recreate()` 为「销毁 + 全新 `startActivity`」——新实例在前，再 `finish()` 旧实例，使新窗口以 **全新启动路径** 建立，规避系统原地重建带来的 Compose 重组冻结。**禁止**直接调用 `super.recreate()` / `Activity.recreate()`。
+- **必须**：接管 `recreate()` 时应保留防重入守卫（`recreatePending` + `isFinishing`/`isDestroyed`），并在 `onCreate` 记录实例创建时刻；重建广播（`ThemeConfig.notifyRecreate` 1.5s 防抖后迟到的事件总线 `RECEIVE`）必须被「实例创建时刻 + 2s 宽限」拦截，避免二次重建打断正在建立的窗口。
+  参考实现：`ui/config/theme/manage/ThemeManageActivity`（`recreate()` 接管 + `RECREATE_IGNORE_MS = 2000L` 宽限）。
+
+#### 7.8.2 新建代码的优先方向（推荐）
+
+- **强烈推荐**：纯 Compose 页面（不依赖 `values-night` 等 XML 资源的页面）主题切换**优先「状态驱动、不重建」**——把主题色作为可观察状态直接更新，Compose 自身完成重组重绘，从根上避开重建路径。`setDefaultNightMode` 只留给确实需要切换 XML 资源的场景（Dialog 样式、系统资源等）。
+- **推荐**：新写主题切换逻辑前先对照本文件 §7 与 `ThemeConfig`/`LegadoTheme` 的现有实现，确认是否必须重建，能省则省。
+
+#### 7.8.3 排查与迁移
+
+- 发现「主题/顶栏/底栏等配置切换后，某些控件点击无反应、整页不刷新」时，先按三个探针定性：① 输入是否到达（clickable 是否执行）② snapshot 状态是否写入 ③ 重组探针是否触发。若①②通而③不触发，即为重建路径问题，按 §7.8.1 改造，不要改内容、不要堆「手动刷新」修复。
+- 迁移老页面时，现有 `ThemeManageActivity` 已按本节落地；其它 `BaseComposeActivity` 页面如出现同类冻结，参照改造后再提交。
 
 ---

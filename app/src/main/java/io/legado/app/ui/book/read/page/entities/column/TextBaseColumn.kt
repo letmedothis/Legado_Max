@@ -17,6 +17,7 @@ interface TextBaseColumn : BaseColumn {
     val bgImage: String
     val bgImageFit: Int
     val bgImageScale: Float
+
     /** 高亮规则指定字体路径，空串表示跟随阅读字体 */
     val fontPath: String get() = ""
     var selected: Boolean

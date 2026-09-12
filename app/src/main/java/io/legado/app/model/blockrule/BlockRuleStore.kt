@@ -68,9 +68,7 @@ object BlockRuleStore {
     /**
      * 加载已启用且有匹配模式的规则（原始 BlockRule）
      */
-    fun loadEnabled(context: Context): List<BlockRule> {
-        return load(context).filter { it.enabled && it.pattern.isNotBlank() }
-    }
+    fun loadEnabled(context: Context): List<BlockRule> = load(context).filter { it.enabled && it.pattern.isNotBlank() }
 
     /**
      * 加载已编译的屏蔽规则列表（缓存）
@@ -147,9 +145,11 @@ object BlockRuleStore {
             if (applicableRules.isEmpty()) {
                 result.addAll(sourceBooks)
             } else {
-                result.addAll(sourceBooks.filterNot { book ->
-                    applicableRules.any { rule -> rule.matches(book) }
-                })
+                result.addAll(
+                    sourceBooks.filterNot { book ->
+                        applicableRules.any { rule -> rule.matches(book) }
+                    },
+                )
             }
         }
 
@@ -330,7 +330,7 @@ object BlockRuleStore {
     /** BlockRule 的规范字段名，用于识别混淆版本写出的损坏 JSON */
     private val canonicalFieldNames = setOf(
         "id", "name", "pattern", "isRegex", "group", "targetScope",
-        "rssTargetScope", "enabled", "scope", "rssScope"
+        "rssTargetScope", "enabled", "scope", "rssScope",
     )
 
     /**

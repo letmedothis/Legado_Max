@@ -29,8 +29,10 @@ data class CharStyle(
      * 字色取最后一条指定了字色的规则。
      */
     fun mergedWith(later: CharStyle): CharStyle {
-        if (later.underlineMode != 0 && later.bgImage.isNotEmpty() &&
-            later.bgColor != null && later.textColor != null
+        if (later.underlineMode != 0 &&
+            later.bgImage.isNotEmpty() &&
+            later.bgColor != null &&
+            later.textColor != null
         ) {
             return later
         }

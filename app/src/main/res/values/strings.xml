@@ -204,6 +204,7 @@
     <string name="book_file_selector">Add books</string>
     <string name="scan_book_source">Scan</string>
     <string name="copy_source">Copy source</string>
+    <string name="paste">Paste</string>
     <string name="paste_source">Paste source</string>
     <string name="source_rule_s">Source rules description</string>
     <string name="check_update">Check for Updates</string>
@@ -790,6 +791,8 @@
     <string name="add_to_text_context_menu_s">Long tap to display Legado·Search in the operation menu</string>
     <string name="add_to_text_context_menu_t">Text operation display Search</string>
     <string name="record_log">Record log</string>
+    <string name="debug_log">Debug log</string>
+    <string name="export_log">Export log</string>
     <string name="log">Log</string>
     <string name="chinese_converter">Simplified conversion</string>
     <string name="change_icon_error">The icon is a vector icon, which was not supported before Android 8.0</string>
@@ -1078,6 +1081,19 @@
     <string name="export_to_web_dav">Export to WebDav</string>
     <string name="reverse_content">Reverse content</string>
     <string name="debug">Debug</string>
+    <string name="source_used_api">Source Used API</string>
+    <string name="api_category_variable">Built-in Variables</string>
+    <string name="api_category_function">Built-in Functions</string>
+    <string name="api_category_source_method">Source Methods</string>
+    <string name="api_used">Used</string>
+    <string name="api_not_used">Not used</string>
+    <string name="api_no_usage">Not used in this source</string>
+    <string name="api_empty_list">No items</string>
+    <string name="api_copied">Copied "%1$s"</string>
+    <string name="api_copy_mode_enabled">Copy mode enabled</string>
+    <string name="api_copy_mode_disabled">Copy mode disabled</string>
+    <string name="api_usage_locations">Usage locations of "%1$s"</string>
+    <string name="api_source_not_found">Source not found</string>
     <string name="crash_log">Crash log</string>
     <string name="use_zh_layout">Custom Chinese line feed</string>
     <string name="image_style">Style of Images</string>
@@ -1855,6 +1871,7 @@
     <string name="unknown_type">Unknown type</string>
 
     <!-- URL Record -->
+    <string name="url_record_count">Total %1$d records</string>
     <string name="url_record">URL Access Record</string>
     <string name="record_url_switch">Enable URL Recording</string>
     <string name="record_url_enabled">URL Recording Enabled</string>
@@ -1891,6 +1908,7 @@
     <string name="export_to_file">Export to File</string>
 
     <!-- Cover Gallery -->
+    <string name="import_zip">Import zip</string>
     <string name="cover_gallery">Cover Gallery</string>
     <string name="cover_gallery_summary">Manage group cover gallery, can be set as global default cover source</string>
 

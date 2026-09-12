@@ -31,10 +31,10 @@ import java.net.InetAddress
 
 /**
  * 应用全局配置单例
- * 
+ *
  * 使用 SharedPreferences 存储和读取用户配置，支持配置变更监听。
  * 所有配置项都通过 getter/setter 访问，自动持久化到本地存储。
- * 
+ *
  * 主要配置分类：
  * - 主题与界面配置（themeMode, isNightTheme, isEInkMode 等）
  * - 阅读相关配置（点击区域动作、翻页设置等）
@@ -54,7 +54,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
     var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
     var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
-    
+
     // ==================== 点击区域动作配置 ====================
     // 九宫格点击区域: TL(左上) TC(中上) TR(右上)
     //               ML(左中) MC(中中) MR(右中)
@@ -69,12 +69,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBL = appCtx.getPrefInt(PreferKey.clickActionBL, 2)
     var clickActionBC = appCtx.getPrefInt(PreferKey.clickActionBC, 1)
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
-    
+
     // ==================== 主题与界面配置 ====================
     var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
-    var optimizeRender = CanvasRecorderFactory.isSupport
-            && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
+    var optimizeRender = CanvasRecorderFactory.isSupport &&
+        appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
     var recordUrl = appCtx.getPrefBoolean(PreferKey.recordUrl)
 
@@ -82,7 +82,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     /** 调试专属模式总开关，控制按 category 路由分流功能是否启用 */
     var debugLogOnlyEnabled: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.debugLogOnlyEnabled, true)
-        set(value) { appCtx.putPrefBoolean(PreferKey.debugLogOnlyEnabled, value) }
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.debugLogOnlyEnabled, value)
+        }
 
     /** 被标记为"只进调试界面"的 DebugCategory 集合（持久化为逗号分隔字符串） */
     var debugLogOnlyCategories: Set<DebugCategory>
@@ -138,38 +140,49 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 isEInkMode = themeMode == "3"
             }
 
-            PreferKey.clickActionTL -> clickActionTL =
-                appCtx.getPrefInt(PreferKey.clickActionTL, 2)
+            PreferKey.clickActionTL ->
+                clickActionTL =
+                    appCtx.getPrefInt(PreferKey.clickActionTL, 2)
 
-            PreferKey.clickActionTC -> clickActionTC =
-                appCtx.getPrefInt(PreferKey.clickActionTC, 2)
+            PreferKey.clickActionTC ->
+                clickActionTC =
+                    appCtx.getPrefInt(PreferKey.clickActionTC, 2)
 
-            PreferKey.clickActionTR -> clickActionTR =
-                appCtx.getPrefInt(PreferKey.clickActionTR, 1)
+            PreferKey.clickActionTR ->
+                clickActionTR =
+                    appCtx.getPrefInt(PreferKey.clickActionTR, 1)
 
-            PreferKey.clickActionML -> clickActionML =
-                appCtx.getPrefInt(PreferKey.clickActionML, 2)
+            PreferKey.clickActionML ->
+                clickActionML =
+                    appCtx.getPrefInt(PreferKey.clickActionML, 2)
 
-            PreferKey.clickActionMC -> clickActionMC =
-                appCtx.getPrefInt(PreferKey.clickActionMC, 0)
+            PreferKey.clickActionMC ->
+                clickActionMC =
+                    appCtx.getPrefInt(PreferKey.clickActionMC, 0)
 
-            PreferKey.clickActionMR -> clickActionMR =
-                appCtx.getPrefInt(PreferKey.clickActionMR, 1)
+            PreferKey.clickActionMR ->
+                clickActionMR =
+                    appCtx.getPrefInt(PreferKey.clickActionMR, 1)
 
-            PreferKey.clickActionBL -> clickActionBL =
-                appCtx.getPrefInt(PreferKey.clickActionBL, 2)
+            PreferKey.clickActionBL ->
+                clickActionBL =
+                    appCtx.getPrefInt(PreferKey.clickActionBL, 2)
 
-            PreferKey.clickActionBC -> clickActionBC =
-                appCtx.getPrefInt(PreferKey.clickActionBC, 1)
+            PreferKey.clickActionBC ->
+                clickActionBC =
+                    appCtx.getPrefInt(PreferKey.clickActionBC, 1)
 
-            PreferKey.clickActionBR -> clickActionBR =
-                appCtx.getPrefInt(PreferKey.clickActionBR, 1)
+            PreferKey.clickActionBR ->
+                clickActionBR =
+                    appCtx.getPrefInt(PreferKey.clickActionBR, 1)
 
-            PreferKey.readBodyToLh -> ReadBookConfig.readBodyToLh =
-                appCtx.getPrefBoolean(PreferKey.readBodyToLh, true)
+            PreferKey.readBodyToLh ->
+                ReadBookConfig.readBodyToLh =
+                    appCtx.getPrefBoolean(PreferKey.readBodyToLh, true)
 
-            PreferKey.useZhLayout -> ReadBookConfig.useZhLayout =
-                appCtx.getPrefBoolean(PreferKey.useZhLayout)
+            PreferKey.useZhLayout ->
+                ReadBookConfig.useZhLayout =
+                    appCtx.getPrefBoolean(PreferKey.useZhLayout)
 
             PreferKey.userAgent -> userAgent = getPrefUserAgent()
 
@@ -187,20 +200,21 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
             PreferKey.antiAlias -> useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
 
-            PreferKey.useDefaultCover -> useDefaultCover =
-                appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
+            PreferKey.useDefaultCover ->
+                useDefaultCover =
+                    appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
 
-            PreferKey.optimizeRender -> optimizeRender = CanvasRecorderFactory.isSupport
-                    && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
+            PreferKey.optimizeRender ->
+                optimizeRender = CanvasRecorderFactory.isSupport &&
+                    appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
 
             PreferKey.recordLog -> recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
 
             PreferKey.recordUrl -> recordUrl = appCtx.getPrefBoolean(PreferKey.recordUrl)
-
         }
     }
 
-    //dns配置
+    // dns配置
     private var _hostMap: Map<String, Any?>? = null
     val hostMap: Map<String, Any?>
         get() = _hostMap ?: run {
@@ -222,12 +236,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             _addressCache = cache
             cache
         }
-    private fun List<*>.parseIpsFromList(): List<InetAddress> =
-        mapNotNull { element ->
-            (element as? String)?.trim()?.takeIf { it.isNotEmpty() }
-                ?.runCatching { InetAddress.getByName(this) }
-                ?.getOrNull()
-        }
+    private fun List<*>.parseIpsFromList(): List<InetAddress> = mapNotNull { element ->
+        (element as? String)?.trim()?.takeIf { it.isNotEmpty() }
+            ?.runCatching { InetAddress.getByName(this) }
+            ?.getOrNull()
+    }
 
     var isNightTheme: Boolean
         get() = when (themeMode) {
@@ -238,11 +251,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
         set(value) {
             if (isNightTheme != value) {
-                if (value) {
-                    appCtx.putPrefString(PreferKey.themeMode, "2")
-                } else {
-                    appCtx.putPrefString(PreferKey.themeMode, "1")
-                }
+                // 同步刷新本地缓存，保证同栈内 initNightMode() 读到正确目标模式，
+                // 避免缓存滞后触发错误/多余的 AppCompat 模式切换重建
+                themeMode = if (value) "2" else "1"
+                isEInkMode = false
+                appCtx.putPrefString(PreferKey.themeMode, themeMode)
             }
         }
     var showBookname: Int
@@ -374,18 +387,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
 // 下拉选择分组开关（默认关闭，仅在分组样式为标签时生效）
-var dropdownSelectGroup: Boolean
-get() = appCtx.getPrefBoolean(PreferKey.dropdownSelectGroup, false)
-set(value) {
-appCtx.putPrefBoolean(PreferKey.dropdownSelectGroup, value)
-}
+    var dropdownSelectGroup: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.dropdownSelectGroup, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.dropdownSelectGroup, value)
+        }
 
 // 显示标签栏开关（默认关闭，开启后在书架分组下方显示二级标签栏）
-var showBookshelfTagBar: Boolean
-get() = appCtx.getPrefBoolean(PreferKey.showBookshelfTagBar, false)
-set(value) {
-appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
-}
+    var showBookshelfTagBar: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showBookshelfTagBar, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
+        }
 
     /**
      * 书架每个分组配置的标签列表。
@@ -394,7 +407,7 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
     var bookshelfGroupTags: Map<Long, List<String>>
         get() {
             val rawMap = GSON.fromJsonObject<Map<String, List<String>>>(
-                appCtx.getPrefString(PreferKey.bookshelfGroupTags)
+                appCtx.getPrefString(PreferKey.bookshelfGroupTags),
             ).getOrDefault(emptyMap())
             return rawMap.mapNotNull { (key, value) ->
                 key.toLongOrNull()?.let { k -> k to value }
@@ -419,7 +432,7 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
     var bookshelfHiddenTags: Map<Long, Set<String>>
         get() {
             val rawMap = GSON.fromJsonObject<Map<String, List<String>>>(
-                appCtx.getPrefString(PreferKey.bookshelfHiddenTags)
+                appCtx.getPrefString(PreferKey.bookshelfHiddenTags),
             ).getOrDefault(emptyMap())
             return rawMap.mapNotNull { (key, value) ->
                 key.toLongOrNull()?.let { k -> k to value.toSet() }
@@ -614,10 +627,14 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
         }
 
     var elevation: Int
-        get() = if (isEInkMode) 0 else appCtx.getPrefInt(
-            PreferKey.barElevation,
-            AppConst.sysElevation
-        )
+        get() = if (isEInkMode) {
+            0
+        } else {
+            appCtx.getPrefInt(
+                PreferKey.barElevation,
+                AppConst.sysElevation,
+            )
+        }
         set(value) {
             appCtx.putPrefInt(PreferKey.barElevation, value)
         }
@@ -830,17 +847,19 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.importShowComment, value)
         }
-    //点击图片方式
+
+    // 点击图片方式
     val clickImgWay: String?
         get() = appCtx.getPrefString(PreferKey.clickImgWay)
-    //预下载章节数量
+
+    // 预下载章节数量
     var preDownloadNum
         get() = appCtx.getPrefInt(PreferKey.preDownloadNum, 0)
         set(value) {
             appCtx.putPrefInt(PreferKey.preDownloadNum, value)
         }
 
-    //向前预下载章节数量
+    // 向前预下载章节数量
     var backwardPreDownloadNum
         get() = appCtx.getPrefInt(PreferKey.backwardPreDownloadNum, 0)
         set(value) {
@@ -877,7 +896,7 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
     var pauseReadAloudWhilePhoneCalls
         get() = appCtx.getPrefBoolean(PreferKey.pauseReadAloudWhilePhoneCalls, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.pauseReadAloudWhilePhoneCalls, value)
-        
+
     val onlyLatestBackup get() = appCtx.getPrefBoolean(PreferKey.onlyLatestBackup, false)
 
     var autoBackup: Boolean
@@ -986,10 +1005,8 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
             appCtx.putPrefInt(PreferKey.bookshelfSort, value)
         }
 
-    fun getBookSortByGroupId(groupId: Long): Int {
-        return appDb.bookGroupDao.getByID(groupId)?.getRealBookSort()
-            ?: bookshelfSort
-    }
+    fun getBookSortByGroupId(groupId: Long): Int = appDb.bookGroupDao.getByID(groupId)?.getRealBookSort()
+        ?: bookshelfSort
 
     private fun getPrefUserAgent(): String {
         val ua = appCtx.getPrefString(PreferKey.userAgent)
@@ -1062,11 +1079,11 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
         }
     }
 
-    //跳转到漫画界面不使用富文本模式
+    // 跳转到漫画界面不使用富文本模式
     val showMangaUi: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showMangaUi, true)
 
-    //禁用漫画缩放
+    // 禁用漫画缩放
     var disableMangaScale: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.disableMangaScale, true)
         set(value) {
@@ -1079,35 +1096,35 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
             appCtx.putPrefBoolean(PreferKey.disableMangaPageAnim, value)
         }
 
-    //漫画预加载数量
+    // 漫画预加载数量
     var mangaPreDownloadNum
         get() = appCtx.getPrefInt(PreferKey.mangaPreDownloadNum, 10)
         set(value) {
             appCtx.putPrefInt(PreferKey.mangaPreDownloadNum, value)
         }
 
-    //点击翻页
+    // 点击翻页
     var disableClickScroll
         get() = appCtx.getPrefBoolean(PreferKey.disableClickScroll, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.disableClickScroll, value)
         }
 
-    //漫画滚动速度
+    // 漫画滚动速度
     var mangaAutoPageSpeed
         get() = appCtx.getPrefInt(PreferKey.mangaAutoPageSpeed, 3)
         set(value) {
             appCtx.putPrefInt(PreferKey.mangaAutoPageSpeed, value)
         }
 
-    //漫画页脚配置
+    // 漫画页脚配置
     var mangaFooterConfig
         get() = appCtx.getPrefString(PreferKey.mangaFooterConfig, "")
         set(value) {
             appCtx.putPrefString(PreferKey.mangaFooterConfig, value)
         }
 
-    //漫画水平滚动
+    // 漫画水平滚动
     var enableMangaHorizontalScroll
         get() = mangaReadMode != MangaReadMode.SCROLL
         set(value) {
@@ -1124,14 +1141,14 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
             appCtx.putPrefString(PreferKey.mangaColorFilter, value)
         }
 
-    //禁用漫画内标题
+    // 禁用漫画内标题
     var hideMangaTitle
         get() = appCtx.getPrefBoolean(PreferKey.hideMangaTitle, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.hideMangaTitle, value)
         }
 
-    //开启墨水屏模式
+    // 开启墨水屏模式
     var enableMangaEInk
         get() = appCtx.getPrefBoolean(PreferKey.enableMangaEInk, false)
         set(value) {
@@ -1195,7 +1212,7 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
 
     // ==================== 字重精细调整配置 ====================
-    
+
     /**
      * 是否已显示过精细调整首次提示
      * 用于控制只在第一次切换到精细模式时显示提示对话框
@@ -1234,4 +1251,3 @@ appCtx.putPrefBoolean(PreferKey.showBookshelfTagBar, value)
             appCtx.putPrefBoolean(PreferKey.forceSoftwareParagraphBubble, value)
         }
 }
-

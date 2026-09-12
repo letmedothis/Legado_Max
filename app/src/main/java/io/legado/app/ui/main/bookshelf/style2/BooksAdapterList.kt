@@ -29,8 +29,7 @@ import io.legado.app.utils.dpToPx
 import splitties.views.onLongClick
 
 @Suppress("UNUSED_PARAMETER")
-class BooksAdapterList(context: Context, callBack: CallBack) :
-    BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
+class BooksAdapterList(context: Context, callBack: CallBack) : BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
 
     private fun updateReadProgress(pb: LinearProgressIndicator, tvReadPercent: TextView, item: Book) {
         val progress = if (AppConfig.showBookshelfReadProgress) item.readProgress() else null
@@ -48,28 +47,28 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return when (viewType) {
-            1 -> {
-                // 根据folderLayout选择文件夹布局
-                if (AppConfig.folderLayout >= 2) {
-                    GroupGridViewHolder(ItemBookshelfGridGroupBinding.inflate(inflater, parent, false))
-                } else {
-                    GroupViewHolder(ItemBookshelfListGroupBinding.inflate(inflater, parent, false))
-                }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder = when (viewType) {
+        1 -> {
+            // 根据folderLayout选择文件夹布局
+            if (AppConfig.folderLayout >= 2) {
+                GroupGridViewHolder(ItemBookshelfGridGroupBinding.inflate(inflater, parent, false))
+            } else {
+                GroupViewHolder(ItemBookshelfListGroupBinding.inflate(inflater, parent, false))
             }
-            else -> {
-                if (AppConfig.bookLayout == 0) { BookViewHolder(ItemBookshelfListBinding.inflate(inflater, parent, false)) }
-                else { BookViewHolder2(ItemBookshelfList2Binding.inflate(inflater, parent, false)) }
+        }
+        else -> {
+            if (AppConfig.bookLayout == 0) {
+                BookViewHolder(ItemBookshelfListBinding.inflate(inflater, parent, false))
+            } else {
+                BookViewHolder2(ItemBookshelfList2Binding.inflate(inflater, parent, false))
             }
-
         }
     }
 
     override fun onBindViewHolder(
         holder: RecyclerView.ViewHolder,
         position: Int,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         when (holder) {
             is BookViewHolder -> (getItem(position) as? Book)?.let {
@@ -94,8 +93,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         }
     }
 
-    inner class BookViewHolder(val binding: ItemBookshelfListBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class BookViewHolder(val binding: ItemBookshelfListBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
             // 根据配置控制书籍外边框显示和间距
@@ -103,7 +101,10 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 root.background = context.bookBorderBackground
                 root.setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
                 (root.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(
-                    4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx()
+                    4.dpToPx(),
+                    4.dpToPx(),
+                    4.dpToPx(),
+                    4.dpToPx(),
                 )
             } else {
                 root.background = null
@@ -140,7 +141,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "last" -> tvLast.text = item.latestChapterTitle
                             "cover" -> ivCover.load(
                                 item,
-                                false
+                                false,
                             )
 
                             "refresh" -> {
@@ -221,26 +222,24 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         }
 
         /** 创建单个标签视图（带外框样式） */
-        private fun createTagView(tag: String): TextView {
-            return TextView(context).apply {
-                text = tag
-                textSize = 11f
-                gravity = Gravity.CENTER
-                setTextColor(context.resources.getColor(io.legado.app.R.color.tv_text_summary, null))
-                // 根据书籍外边框状态同步标签外框：有边框时使用带描边的标签背景，无边框时仅显示纯文本
-                if (AppConfig.showBookBorder) {
-                    setBackgroundResource(io.legado.app.R.drawable.bg_tag)
-                }
-                // 设置内边距
-                setPadding(8, 4, 8, 4)
-                // 设置 FlexboxLayout.LayoutParams
-                layoutParams = FlexboxLayout.LayoutParams(
-                    FlexboxLayout.LayoutParams.WRAP_CONTENT,
-                    FlexboxLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    // 标签之间的间距
-                    setMargins(4, 2, 4, 2)
-                }
+        private fun createTagView(tag: String): TextView = TextView(context).apply {
+            text = tag
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setTextColor(context.resources.getColor(io.legado.app.R.color.tv_text_summary, null))
+            // 根据书籍外边框状态同步标签外框：有边框时使用带描边的标签背景，无边框时仅显示纯文本
+            if (AppConfig.showBookBorder) {
+                setBackgroundResource(io.legado.app.R.drawable.bg_tag)
+            }
+            // 设置内边距
+            setPadding(8, 4, 8, 4)
+            // 设置 FlexboxLayout.LayoutParams
+            layoutParams = FlexboxLayout.LayoutParams(
+                FlexboxLayout.LayoutParams.WRAP_CONTENT,
+                FlexboxLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                // 标签之间的间距
+                setMargins(4, 2, 4, 2)
             }
         }
 
@@ -254,14 +253,12 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 binding.tvLastUpdateTime.text = ""
             }
         }
-
     }
 
     /**
-    紧凑列表布局
+     紧凑列表布局
      */
-    inner class BookViewHolder2(val binding: ItemBookshelfList2Binding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class BookViewHolder2(val binding: ItemBookshelfList2Binding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
             // 根据配置控制书籍外边框显示和间距
@@ -269,7 +266,10 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 root.background = context.bookBorderBackground
                 root.setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
                 (root.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(
-                    4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx()
+                    4.dpToPx(),
+                    4.dpToPx(),
+                    4.dpToPx(),
+                    4.dpToPx(),
                 )
             } else {
                 root.background = null
@@ -303,7 +303,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "last" -> tvLast.text = item.latestChapterTitle
                             "cover" -> ivCover.load(
                                 item,
-                                false
+                                false,
                             )
 
                             "refresh" -> {
@@ -351,11 +351,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 binding.tvLastUpdateTime.text = ""
             }
         }
-
     }
 
-    inner class GroupViewHolder(val binding: ItemBookshelfListGroupBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class GroupViewHolder(val binding: ItemBookshelfListGroupBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
             tvName.text = item.groupName
@@ -393,11 +391,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
 
-    inner class GroupGridViewHolder(val binding: ItemBookshelfGridGroupBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class GroupGridViewHolder(val binding: ItemBookshelfGridGroupBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
             tvName.text = item.groupName
@@ -428,7 +424,5 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
-
 }

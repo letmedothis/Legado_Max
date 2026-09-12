@@ -56,7 +56,7 @@ private const val MENU_EXPORT = 6103
 private data class ApplicationThemeListItem(
     val config: ApplicationThemeManager.Config,
     val summary: String,
-    val isCurrent: Boolean
+    val isCurrent: Boolean,
 )
 
 /**
@@ -130,13 +130,20 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
      * 处理选项菜单项点击事件。
      * 根据菜单项 ID 执行对应操作。
      */
-    override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            MENU_CREATE -> { showNameDialog(); true }
-            MENU_IMPORT -> { showImportOptionsDialog(); true }
-            MENU_EXPORT -> { exportCurrent(); true }
-            else -> super.onCompatOptionsItemSelected(item)
+    override fun onCompatOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        MENU_CREATE -> {
+            showNameDialog()
+            true
         }
+        MENU_IMPORT -> {
+            showImportOptionsDialog()
+            true
+        }
+        MENU_EXPORT -> {
+            exportCurrent()
+            true
+        }
+        else -> super.onCompatOptionsItemSelected(item)
     }
 
     /**
@@ -211,8 +218,8 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
                         importDayBottomBar = cbDayBottomBar.isChecked,
                         importNightBottomBar = cbNightBottomBar.isChecked,
                         importDayCover = cbDayCover.isChecked,
-                        importNightCover = cbNightCover.isChecked
-                    )
+                        importNightCover = cbNightCover.isChecked,
+                    ),
                 )
                 selectImport()
             }
@@ -283,21 +290,21 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
                         ApplicationThemeListItem(
                             config = config,
                             summary = ApplicationThemeManager.summary(this@ApplicationThemeActivity, config),
-                            isCurrent = ApplicationThemeManager.isCurrent(this@ApplicationThemeActivity, config)
+                            isCurrent = ApplicationThemeManager.isCurrent(this@ApplicationThemeActivity, config),
                         )
                     }
                 }
             }.onSuccess { items ->
-                    adapter.setItems(items)
-                    binding.tvMsg.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-                    binding.tvMsg.text = getString(R.string.application_theme_empty)
-                }
+                adapter.setItems(items)
+                binding.tvMsg.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+                binding.tvMsg.text = getString(R.string.application_theme_empty)
+            }
                 .onFailure {
                     adapter.setItems(emptyList())
                     binding.tvMsg.visibility = View.VISIBLE
                     binding.tvMsg.text = it.localizedMessage ?: getString(R.string.error)
                 }
-            }
+        }
     }
 
     /**
@@ -369,14 +376,14 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
             getString(R.string.application_theme_update_current),
             getString(R.string.application_theme_rename),
             getString(R.string.export),
-            getString(R.string.delete)
+            getString(R.string.delete),
         )
         selector(config.name, items) { _, index ->
             when (index) {
                 0 -> openEditor(config)
                 1 -> {
                     ApplicationThemeManager.replace(
-                        ApplicationThemeManager.captureCurrent(this, config.name, config.id)
+                        ApplicationThemeManager.captureCurrent(this, config.name, config.id),
                     )
                     toastOnUi(R.string.success)
                     refresh()
@@ -455,7 +462,7 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
             otherActions = arrayListOf(
                 SelectItem(getString(R.string.sys_folder_picker), HandleFileContract.DIR),
                 SelectItem(getString(R.string.app_folder_picker), 10),
-                SelectItem(getString(R.string.manual_input), 112)
+                SelectItem(getString(R.string.manual_input), 112),
             )
         }
     }
@@ -547,7 +554,7 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
                     deleteDayBottomBar = cbDayBottomBar.isChecked,
                     deleteNightBottomBar = cbNightBottomBar.isChecked,
                     deleteDayCover = cbDayCover.isChecked,
-                    deleteNightCover = cbNightCover.isChecked
+                    deleteNightCover = cbNightCover.isChecked,
                 )
                 ApplicationThemeManager.saveDeleteOptions(this@ApplicationThemeActivity, options)
                 lifecycleScope.launch {
@@ -555,7 +562,7 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
                         ApplicationThemeManager.deleteWithComponents(
                             this@ApplicationThemeActivity,
                             config.id,
-                            options
+                            options,
                         )
                     }
                     refresh()
@@ -565,15 +572,12 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
         }
     }
 
-    private inner class Adapter(context: Context) :
-        RecyclerAdapter<ApplicationThemeListItem, ItemThemeConfigBinding>(context) {
+    private inner class Adapter(context: Context) : RecyclerAdapter<ApplicationThemeListItem, ItemThemeConfigBinding>(context) {
 
         /**
          * 创建列表项的视图绑定。
          */
-        override fun getViewBinding(parent: ViewGroup): ItemThemeConfigBinding {
-            return ItemThemeConfigBinding.inflate(inflater, parent, false)
-        }
+        override fun getViewBinding(parent: ViewGroup): ItemThemeConfigBinding = ItemThemeConfigBinding.inflate(inflater, parent, false)
 
         /**
          * 绑定数据到列表项视图。
@@ -583,7 +587,7 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
             holder: ItemViewHolder,
             binding: ItemThemeConfigBinding,
             item: ApplicationThemeListItem,
-            payloads: MutableList<Any>
+            payloads: MutableList<Any>,
         ) = binding.run {
             val config = item.config
             val isBuiltin = config.id == ApplicationThemeManager.builtinThemeId
@@ -599,17 +603,17 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
             ivCurrent.visibility = if (item.isCurrent) View.VISIBLE else View.GONE
             tvApply.text = getString(if (item.isCurrent) R.string.applied else R.string.apply)
             tvApply.setTextColor(
-                if (item.isCurrent) accentColor else ContextCompat.getColor(context, R.color.primaryText)
+                if (item.isCurrent) accentColor else ContextCompat.getColor(context, R.color.primaryText),
             )
             val isNight = AppConfig.isNightTheme
             val previewTheme = if (isNight) config.nightTheme else config.dayTheme
             val background = parseThemeColor(
                 previewTheme?.backgroundColor,
-                if (isNight) R.color.default_night_background else R.color.default_background
+                if (isNight) R.color.default_night_background else R.color.default_background,
             )
             val primary = parseThemeColor(
                 previewTheme?.primaryColor,
-                if (isNight) R.color.default_night_primary else R.color.default_primary
+                if (isNight) R.color.default_night_primary else R.color.default_primary,
             )
             previewContainer.elevation = 8.dp.toFloat()
             previewContainer.translationZ = 2.dp.toFloat()
@@ -678,10 +682,8 @@ class ApplicationThemeActivity : BaseActivity<ActivityThemeManageBinding>() {
      * @param fallback 备用颜色资源 ID
      * @return 解析后的颜色值
      */
-    private fun parseThemeColor(value: String?, fallback: Int): Int {
-        return runCatching { Color.parseColor(value) }
-            .getOrDefault(ContextCompat.getColor(this, fallback))
-    }
+    private fun parseThemeColor(value: String?, fallback: Int): Int = runCatching { Color.parseColor(value) }
+        .getOrDefault(ContextCompat.getColor(this, fallback))
 
     /**
      * dp 转 px 的扩展属性。

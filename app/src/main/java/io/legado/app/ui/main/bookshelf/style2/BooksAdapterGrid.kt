@@ -23,8 +23,7 @@ import io.legado.app.utils.visible
 import splitties.views.onLongClick
 
 @Suppress("UNUSED_PARAMETER")
-class BooksAdapterGrid(context: Context, callBack: CallBack) :
-    BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
+class BooksAdapterGrid(context: Context, callBack: CallBack) : BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
     private val showBookname = AppConfig.showBookname
 
     private fun updateReadProgress(pb: LinearProgressIndicator, item: Book) {
@@ -42,25 +41,23 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
-        viewType: Int
-    ): RecyclerView.ViewHolder {
-        return when (viewType) {
-            1 -> {
-                // 根据folderLayout选择文件夹布局：列表模式下使用列表布局避免封面尺寸异常
-                if (AppConfig.folderLayout >= 2) {
-                    when (showBookname) {
-                        2 -> GroupViewHolder2(ItemBookshelfGridGroup2Binding.inflate(inflater, parent, false))
-                        else -> GroupViewHolder(ItemBookshelfGridGroupBinding.inflate(inflater, parent, false))
-                    }
-                } else {
-                    GroupListViewHolder(ItemBookshelfListGroupBinding.inflate(inflater, parent, false))
-                }
-            }
-            else -> {
+        viewType: Int,
+    ): RecyclerView.ViewHolder = when (viewType) {
+        1 -> {
+            // 根据folderLayout选择文件夹布局：列表模式下使用列表布局避免封面尺寸异常
+            if (AppConfig.folderLayout >= 2) {
                 when (showBookname) {
-                    2 -> BookViewHolder2(ItemBookshelfGrid2Binding.inflate(inflater, parent, false))
-                    else -> BookViewHolder(ItemBookshelfGridBinding.inflate(inflater, parent, false))
+                    2 -> GroupViewHolder2(ItemBookshelfGridGroup2Binding.inflate(inflater, parent, false))
+                    else -> GroupViewHolder(ItemBookshelfGridGroupBinding.inflate(inflater, parent, false))
                 }
+            } else {
+                GroupListViewHolder(ItemBookshelfListGroupBinding.inflate(inflater, parent, false))
+            }
+        }
+        else -> {
+            when (showBookname) {
+                2 -> BookViewHolder2(ItemBookshelfGrid2Binding.inflate(inflater, parent, false))
+                else -> BookViewHolder(ItemBookshelfGridBinding.inflate(inflater, parent, false))
             }
         }
     }
@@ -68,7 +65,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
     override fun onBindViewHolder(
         holder: RecyclerView.ViewHolder,
         position: Int,
-        payloads: MutableList<Any>
+        payloads: MutableList<Any>,
     ) {
         when (holder) {
             is BookViewHolder -> (getItem(position) as? Book)?.let {
@@ -98,8 +95,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
         }
     }
 
-    inner class BookViewHolder(val binding: ItemBookshelfGridBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class BookViewHolder(val binding: ItemBookshelfGridBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
             if (showBookname == 1) {
@@ -124,7 +120,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                             "name" -> tvName.text = item.name
                             "cover" -> ivCover.load(
                                 item,
-                                false
+                                false,
                             )
 
                             "refresh" -> {
@@ -160,11 +156,9 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 }
             }
         }
-
     }
 
-    inner class BookViewHolder2(val binding: ItemBookshelfGrid2Binding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class BookViewHolder2(val binding: ItemBookshelfGrid2Binding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: Book, position: Int) = binding.run {
             tvName.text = item.name
@@ -184,7 +178,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                             "name" -> tvName.text = item.name
                             "cover" -> ivCover.load(
                                 item,
-                                false
+                                false,
                             )
 
                             "refresh" -> {
@@ -220,11 +214,9 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 }
             }
         }
-
     }
 
-    inner class GroupViewHolder(val binding: ItemBookshelfGridGroupBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class GroupViewHolder(val binding: ItemBookshelfGridGroupBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
             if (showBookname == 1) {
@@ -260,17 +252,15 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
 
-    inner class GroupViewHolder2(val binding: ItemBookshelfGridGroup2Binding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class GroupViewHolder2(val binding: ItemBookshelfGridGroup2Binding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
             item.groupName.let {
                 if (it.isBlank()) {
                     tvName.gone()
-                } else{
+                } else {
                     tvName.visible()
                     tvName.text = it
                 }
@@ -289,7 +279,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                             "groupName" -> item.groupName.let {
                                 if (it.isBlank()) {
                                     tvName.gone()
-                                } else{
+                                } else {
                                     tvName.visible()
                                     tvName.text = it
                                 }
@@ -309,15 +299,13 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
 
     /**
      * 列表模式下的文件夹 ViewHolder（folderLayout < 2 时使用）
      * 使用 item_bookshelf_list_group 布局，封面固定 66x90dp，避免网格适配器中封面撑满全屏
      */
-    inner class GroupListViewHolder(val binding: ItemBookshelfListGroupBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    inner class GroupListViewHolder(val binding: ItemBookshelfListGroupBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun onBind(item: BookGroup, position: Int) = binding.run {
             tvName.text = item.groupName
@@ -356,7 +344,5 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 callBack.onItemLongClick(item)
             }
         }
-
     }
-
 }

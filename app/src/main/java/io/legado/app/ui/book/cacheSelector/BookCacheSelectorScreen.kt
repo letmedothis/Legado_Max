@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -31,8 +30,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,11 +43,12 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
 import io.legado.app.ui.book.cacheSelector.components.BookCacheItemCard
+import io.legado.app.ui.theme.pageAccentColor
 import io.legado.app.ui.theme.pageCardContainerColor
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.utils.ConvertUtils
@@ -71,8 +69,7 @@ fun BookCacheSelectorScreen(
     var searchKey by rememberSaveable { mutableStateOf("") }
     var searchVisible by rememberSaveable { mutableStateOf(false) }
 
-    val accentColor = cacheSelectorAccentColor()
-    val topBarColor = pageCardContainerColor()
+    val accentColor = pageAccentColor()
     val visibleBookItems = bookItems.filter { item ->
         searchKey.isBlank() ||
                 item.book.name.contains(searchKey, ignoreCase = true) ||
@@ -82,28 +79,9 @@ fun BookCacheSelectorScreen(
 
     AppScaffold(
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = topBarColor,
-                    scrolledContainerColor = topBarColor,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                title = {
-                    Text(
-                        text = stringResource(R.string.bcs_title),
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.bcs_title),
+                onBackClick = onBackClick,
                 actions = {
                     IconButton(onClick = {
                         if (searchVisible || searchKey.isNotEmpty()) {
@@ -153,7 +131,7 @@ fun BookCacheSelectorScreen(
                         enabled = selectedCount > 0,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = accentColor,
-                            contentColor = Color.White,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                         )
@@ -309,7 +287,7 @@ private fun SummaryBar(
     selectedCount: Int,
     totalSize: Long
 ) {
-    val accentColor = cacheSelectorAccentColor()
+    val accentColor = pageAccentColor()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
@@ -336,12 +314,6 @@ private fun SummaryBar(
             )
         }
     }
-}
-
-@Composable
-internal fun cacheSelectorAccentColor(): Color {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.18f
-    return if (isDark) Color(0xFF5AB9A8) else Color(0xFF2F7D6B)
 }
 
 @Composable

@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
@@ -51,8 +50,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -62,7 +59,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -86,8 +82,7 @@ import io.legado.app.ui.theme.pageCardElevatedContainerColor
 import io.legado.app.ui.theme.pageMutedIconTint
 import io.legado.app.ui.theme.pageSecondaryTextColor
 import io.legado.app.ui.theme.pageSurfaceVariantColor
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.dialog.TextDialog
@@ -103,7 +98,6 @@ fun CoverGalleryScreen(
     val groups by viewModel.groups.collectAsStateWithLifecycle()
     val messageDialog by viewModel.messageDialog.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val topBarColors = pageTopBarColors()
     val elevatedContainerColor = pageCardElevatedContainerColor()
     val secondaryTextColor = pageSecondaryTextColor()
 
@@ -248,21 +242,9 @@ fun CoverGalleryScreen(
 
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                title = { Text("封面图集") },
+            AppPageTopBar(
+                title = stringResource(R.string.cover_gallery),
+                onBackClick = onBackClick,
                 actions = {
                     IconButton(
                         onClick = {
@@ -274,10 +256,10 @@ fun CoverGalleryScreen(
                             }
                         }
                     ) {
-                        Icon(Icons.Default.FileDownload, contentDescription = "导入zip")
+                        Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.import_zip))
                     }
                     IconButton(onClick = { showSearch = !showSearch }) {
-                        Icon(Icons.Default.Search, contentDescription = "搜索")
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search))
                     }
                     IconButton(
                         onClick = {
@@ -287,7 +269,7 @@ fun CoverGalleryScreen(
                             )
                         }
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "添加分组")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_group))
                     }
                     IconButton(
                         onClick = {

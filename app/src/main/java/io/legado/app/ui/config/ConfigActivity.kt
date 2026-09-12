@@ -3,6 +3,7 @@ package io.legado.app.ui.config
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.EventBus
@@ -15,6 +16,17 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
 
     override val binding by viewBinding(ActivityConfigBinding::inflate)
     override val viewModel by viewModels<ConfigViewModel>()
+
+    /** 后台收到 RECREATE 时置位，回到前台 onResume 再重建，避免与前台页面并发重建窗口 */
+    private var recreateOnResume = false
+
+    override fun onResume() {
+        super.onResume()
+        if (recreateOnResume) {
+            recreateOnResume = false
+            recreate()
+        }
+    }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         when (val configTag = intent.getStringExtra("configTag")) {
@@ -46,8 +58,11 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
     override fun observeLiveBus() {
         super.observeLiveBus()
         observeEvent<String>(EventBus.RECREATE) {
-            recreate()
+            if (lifecycle.currentState == Lifecycle.State.RESUMED) {
+                recreate()
+            } else {
+                recreateOnResume = true
+            }
         }
     }
-
 }

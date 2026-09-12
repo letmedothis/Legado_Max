@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Entity(
     tableName = "rssArticles",
-    primaryKeys = ["origin", "link", "sort"]
+    primaryKeys = ["origin", "link", "sort"],
 )
 data class RssArticle(
     override var origin: String = "",
@@ -31,7 +31,7 @@ data class RssArticle(
     var type: Int = 0,
     /**阅读进度**/
     @ColumnInfo(defaultValue = "0")
-    var durPos: Int = 0
+    var durPos: Int = 0,
 ) : BaseRssArticle {
 
     override fun hashCode() = link.hashCode()
@@ -61,7 +61,7 @@ data class RssArticle(
         group = group,
         variable = variable,
         type = type,
-        durPos = durPos
+        durPos = durPos,
     )
 
     fun toRecord() = RssReadRecord(
@@ -73,6 +73,6 @@ data class RssArticle(
         image = image,
         type = type,
         durPos = durPos,
-        pubDate = pubDate
+        pubDate = pubDate,
     )
 }

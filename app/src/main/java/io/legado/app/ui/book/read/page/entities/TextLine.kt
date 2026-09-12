@@ -10,9 +10,7 @@ import android.graphics.Path
 import android.graphics.Shader
 import android.graphics.drawable.NinePatchDrawable
 import android.os.Build
-import android.text.TextPaint
 import androidx.annotation.Keep
-import androidx.core.graphics.toColorInt
 import io.legado.app.help.PaintPool
 import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
@@ -113,25 +111,19 @@ data class TextLine(
      * FIXED: 修复了当 textColumns 为空时调用 last() 导致的 NoSuchElementException
      * 同时修正了空列占位对象的构造函数参数，确保编译通过。
      */
-    fun getColumn(index: Int): BaseColumn {
-        return textColumns.getOrElse(index) {
-            textColumns.lastOrNull() ?: TextColumn(0f, 0f, "")
-        }
+    fun getColumn(index: Int): BaseColumn = textColumns.getOrElse(index) {
+        textColumns.lastOrNull() ?: TextColumn(0f, 0f, "")
     }
 
     /**
      * 从后向前获取指定位置的文本列
      */
-    fun getColumnReverseAt(index: Int, offset: Int = 0): BaseColumn {
-        return textColumns[textColumns.lastIndex - offset - index]
-    }
+    fun getColumnReverseAt(index: Int, offset: Int = 0): BaseColumn = textColumns[textColumns.lastIndex - offset - index]
 
     /**
      * 获取行内文本列数量
      */
-    fun getColumnsCount(): Int {
-        return textColumns.size
-    }
+    fun getColumnsCount(): Int = textColumns.size
 
     /**
      * 更新行的顶部、底部和基线位置
@@ -145,20 +137,16 @@ data class TextLine(
     /**
      * 判断触摸坐标是否在当前行范围内
      */
-    fun isTouch(x: Float, y: Float, relativeOffset: Float): Boolean {
-        return y > lineTop + relativeOffset
-                && y < lineBottom + relativeOffset
-                && x >= lineStart
-                && x <= lineEnd + 20.dpToPx()
-    }
+    fun isTouch(x: Float, y: Float, relativeOffset: Float): Boolean = y > lineTop + relativeOffset &&
+        y < lineBottom + relativeOffset &&
+        x >= lineStart &&
+        x <= lineEnd + 20.dpToPx()
 
     /**
      * 判断触摸Y坐标是否在当前行范围内
      */
-    fun isTouchY(y: Float, relativeOffset: Float): Boolean {
-        return y > lineTop + relativeOffset
-                && y < lineBottom + relativeOffset
-    }
+    fun isTouchY(y: Float, relativeOffset: Float): Boolean = y > lineTop + relativeOffset &&
+        y < lineBottom + relativeOffset
 
     /**
      * 判断行是否在可视区域内
@@ -385,10 +373,10 @@ data class TextLine(
         if (isImage || columns.isEmpty()) return
         // 检查是否有背景颜色或背景图片
         if (columns.none { (it as? TextBaseColumn)?.let { c -> c.bgImage.isNotEmpty() || c.bgColor != null } == true }) return
-        
+
         // 绘制背景颜色段
         drawBgColorSegments(canvas)
-        
+
         // 绘制背景图片段
         drawBgImageSegments(canvas)
     }
@@ -593,7 +581,7 @@ data class TextLine(
             height - searchPadding,
             searchRadius,
             searchRadius,
-            paint
+            paint,
         )
         PaintPool.recycle(paint)
     }
@@ -651,25 +639,25 @@ data class TextLine(
         }
         PaintPool.recycle(paint)
     }
-    
+
     private fun drawSvgPath(
         canvas: Canvas,
         startX: Float,
         endX: Float,
         lineY: Float,
         svgPathStr: String,
-        paint: Paint
+        paint: Paint,
     ) {
         val baseWidth = 100f
         val baseY = 50f
         val path = io.legado.app.ui.book.read.config.SvgPathParser.parse(svgPathStr) ?: return
-        
+
         val width = endX - startX
         val scaleX = width / baseWidth
         val scaleY = 1f
         val translateX = startX
         val translateY = lineY - baseY
-        
+
         canvas.save()
         canvas.translate(translateX, translateY)
         canvas.scale(scaleX, scaleY)
@@ -732,7 +720,7 @@ data class TextLine(
                 val tileBitmap = if (scale != 1f) {
                     val sw = (bitmap.width * scale).toInt().coerceAtLeast(1)
                     val sh = (bitmap.height * scale).toInt().coerceAtLeast(1)
-                    getScaledBitmap("${bgImage}_s${scale}", bitmap, sw, sh)
+                    getScaledBitmap("${bgImage}_s$scale", bitmap, sw, sh)
                 } else {
                     bitmap
                 }
@@ -956,42 +944,40 @@ data class TextLine(
 
         private fun getScaledBitmap(path: String, source: Bitmap, width: Int, height: Int): Bitmap {
             if (width <= 0 || height <= 0) return source
-            val key = "${path}_${width}_${height}"
+            val key = "${path}_${width}_$height"
             bgScaledBitmapCache.get(key)?.let { return it }
             val scaled = Bitmap.createScaledBitmap(source, width, height, true)
             bgScaledBitmapCache.put(key, scaled)
             return scaled
         }
 
-        private fun loadBgBitmap(path: String): Bitmap? {
-            return try {
-                val ctx = appCtx
-                if (path.startsWith("assets://")) {
-                    val assetPath = path.removePrefix("assets://")
-                    ctx.assets.open(assetPath).use { input ->
-                        decodeSampledBitmap(input)
-                    }
-                } else if (path.startsWith("content://")) {
-                    val uri = android.net.Uri.parse(path)
-                    ctx.contentResolver.openInputStream(uri)?.use { input ->
-                        decodeSampledBitmap(input)
-                    }
-                } else {
-                    val file = java.io.File(path)
-                    if (file.exists()) {
-                        decodeSampledBitmapFile(path)
-                    } else {
-                        val assetPath = if (path.startsWith("bg/")) path else "bg/$path"
-                        kotlin.runCatching {
-                            ctx.assets.open(assetPath).use { input ->
-                                decodeSampledBitmap(input)
-                            }
-                        }.getOrNull()
-                    }
+        private fun loadBgBitmap(path: String): Bitmap? = try {
+            val ctx = appCtx
+            if (path.startsWith("assets://")) {
+                val assetPath = path.removePrefix("assets://")
+                ctx.assets.open(assetPath).use { input ->
+                    decodeSampledBitmap(input)
                 }
-            } catch (e: Exception) {
-                null
+            } else if (path.startsWith("content://")) {
+                val uri = android.net.Uri.parse(path)
+                ctx.contentResolver.openInputStream(uri)?.use { input ->
+                    decodeSampledBitmap(input)
+                }
+            } else {
+                val file = java.io.File(path)
+                if (file.exists()) {
+                    decodeSampledBitmapFile(path)
+                } else {
+                    val assetPath = if (path.startsWith("bg/")) path else "bg/$path"
+                    kotlin.runCatching {
+                        ctx.assets.open(assetPath).use { input ->
+                            decodeSampledBitmap(input)
+                        }
+                    }.getOrNull()
+                }
             }
+        } catch (e: Exception) {
+            null
         }
 
         private fun decodeSampledBitmap(input: java.io.InputStream): Bitmap? {
@@ -1016,7 +1002,7 @@ data class TextLine(
         private fun calculateInSampleSize(
             options: BitmapFactory.Options,
             reqWidth: Int,
-            reqHeight: Int
+            reqHeight: Int,
         ): Int {
             val (height, width) = options.outHeight to options.outWidth
             var inSampleSize = 1
@@ -1099,5 +1085,4 @@ data class TextLine(
             }
         }
     }
-
 }

@@ -4,7 +4,6 @@ import android.graphics.Canvas
 import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.Keep
-import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
 import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.localBook.EpubFootnoteLink
@@ -118,5 +117,4 @@ data class TextHtmlColumn(
             canvas.drawRect(start, 0f, end, textLine.height, view.selectedPaint)
         }
     }
-
 }

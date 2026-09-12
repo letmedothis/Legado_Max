@@ -31,34 +31,41 @@ import splitties.init.appCtx
 @Entity(
     tableName = "chapters",
     primaryKeys = ["url", "bookUrl"],
-    indices = [(Index(value = ["bookUrl"], unique = false)),
-        (Index(value = ["bookUrl", "index"], unique = true))],
-    foreignKeys = [(ForeignKey(
-        entity = Book::class,
-        parentColumns = ["bookUrl"],
-        childColumns = ["bookUrl"],
-        onDelete = ForeignKey.CASCADE
-    ))]
-)    // 删除书籍时自动删除章节
+    indices = [
+        (Index(value = ["bookUrl"], unique = false)),
+        (Index(value = ["bookUrl", "index"], unique = true)),
+    ],
+    foreignKeys = [
+        (
+            ForeignKey(
+                entity = Book::class,
+                parentColumns = ["bookUrl"],
+                childColumns = ["bookUrl"],
+                onDelete = ForeignKey.CASCADE,
+            )
+            ),
+    ],
+) // 删除书籍时自动删除章节
 data class BookChapter(
-    var url: String = "",               // 章节地址
-    var title: String = "",             // 章节标题
-    var isVolume: Boolean = false,      // 是否是卷名
-    var baseUrl: String = "",           // 用来拼接相对url
-    var bookUrl: String = "",           // 书籍地址
-    var index: Int = 0,                 // 章节序号
-    var isVip: Boolean = false,         // 是否VIP
-    var isPay: Boolean = false,         // 是否已购买
-    var resourceUrl: String? = null,    // 音频真实URL
-    var tag: String? = null,            // 更新时间或其他章节附加信息
-    var wordCount: String? = null,      // 本章节字数
-    var start: Long? = null,            // 章节起始位置
-    var end: Long? = null,              // 章节终止位置
-    var startFragmentId: String? = null,  //EPUB书籍当前章节的fragmentId
-    var endFragmentId: String? = null,    //EPUB书籍下一章节的fragmentId
-    var variable: String? = null,        //变量
-    var imgUrl: String? = null // 标题段评图或者视频封面
-) : Parcelable, RuleDataInterface {
+    var url: String = "", // 章节地址
+    var title: String = "", // 章节标题
+    var isVolume: Boolean = false, // 是否是卷名
+    var baseUrl: String = "", // 用来拼接相对url
+    var bookUrl: String = "", // 书籍地址
+    var index: Int = 0, // 章节序号
+    var isVip: Boolean = false, // 是否VIP
+    var isPay: Boolean = false, // 是否已购买
+    var resourceUrl: String? = null, // 音频真实URL
+    var tag: String? = null, // 更新时间或其他章节附加信息
+    var wordCount: String? = null, // 本章节字数
+    var start: Long? = null, // 章节起始位置
+    var end: Long? = null, // 章节终止位置
+    var startFragmentId: String? = null, // EPUB书籍当前章节的fragmentId
+    var endFragmentId: String? = null, // EPUB书籍下一章节的fragmentId
+    var variable: String? = null, // 变量
+    var imgUrl: String? = null, // 标题段评图或者视频封面
+) : Parcelable,
+    RuleDataInterface {
 
     @delegate:Transient
     @delegate:Ignore
@@ -68,18 +75,18 @@ data class BookChapter(
     }
 
     fun putImgUrl(value: String?) {
-        imgUrl =value
+        imgUrl = value
         update()
     }
 
-    fun putLyric(value: String?) { //存入歌词文本
+    fun putLyric(value: String?) { // 存入歌词文本
         // 走 putVariable 的同步协议，避免与并发的 chapter.putVariable 互相覆盖序列化结果
         if (putVariable("lyric", value)) {
             update()
         }
     }
 
-    fun putDanmaku(value: String?) { //存入弹幕文本
+    fun putDanmaku(value: String?) { // 存入弹幕文本
         if (putVariable("danmaku", value)) {
             update()
         }
@@ -106,9 +113,7 @@ data class BookChapter(
         RuleBigDataHelp.putChapterVariable(bookUrl, url, key, value)
     }
 
-    override fun getBigVariable(key: String): String? {
-        return RuleBigDataHelp.getChapterVariable(bookUrl, url, key)
-    }
+    override fun getBigVariable(key: String): String? = RuleBigDataHelp.getChapterVariable(bookUrl, url, key)
 
     override fun hashCode() = url.hashCode()
 
@@ -119,15 +124,13 @@ data class BookChapter(
         return false
     }
 
-    fun primaryStr(): String {
-        return bookUrl + url
-    }
+    fun primaryStr(): String = bookUrl + url
 
     fun getDisplayTitle(
         replaceRules: List<ReplaceRule>? = null,
         useReplace: Boolean = true,
         chineseConvert: Boolean = true,
-        replaceBook: ReplaceBook? = null
+        replaceBook: ReplaceBook? = null,
     ): String {
         var displayTitle = title.replace(AppPattern.rnRegex, "")
         if (chineseConvert) {
@@ -136,33 +139,35 @@ data class BookChapter(
                 2 -> displayTitle = ChineseUtils.s2t(displayTitle)
             }
         }
-        if (useReplace && replaceRules != null) kotlin.run {
-            replaceRules.forEach { item ->
-                if (item.pattern.isNotEmpty()) {
-                    try {
-                        val mDisplayTitle = if (item.isRegex) {
-                            displayTitle.replace(
-                                item.name,
-                                item.regex,
-                                item.replacement,
-                                item.getValidTimeoutMillisecond(),
-                                this@BookChapter,
-                                replaceBook
-                            )
-                        } else {
-                            displayTitle.replace(item.pattern, item.replacement)
+        if (useReplace && replaceRules != null) {
+            kotlin.run {
+                replaceRules.forEach { item ->
+                    if (item.pattern.isNotEmpty()) {
+                        try {
+                            val mDisplayTitle = if (item.isRegex) {
+                                displayTitle.replace(
+                                    item.name,
+                                    item.regex,
+                                    item.replacement,
+                                    item.getValidTimeoutMillisecond(),
+                                    this@BookChapter,
+                                    replaceBook,
+                                )
+                            } else {
+                                displayTitle.replace(item.pattern, item.replacement)
+                            }
+                            if (mDisplayTitle.isNotBlank()) {
+                                displayTitle = mDisplayTitle
+                            }
+                        } catch (_: RegexTimeoutException) {
+                            item.isEnabled = false
+                            appDb.replaceRuleDao.update(item)
+                        } catch (_: CancellationException) {
+                            return@run
+                        } catch (e: Exception) {
+                            AppLog.put("${item.name}替换出错\n替换内容\n$displayTitle", e)
+                            appCtx.toastOnUi("${item.name}替换出错")
                         }
-                        if (mDisplayTitle.isNotBlank()) {
-                            displayTitle = mDisplayTitle
-                        }
-                    } catch (_: RegexTimeoutException) {
-                        item.isEnabled = false
-                        appDb.replaceRuleDao.update(item)
-                    } catch (_: CancellationException) {
-                        return@run
-                    } catch (e: Exception) {
-                        AppLog.put("${item.name}替换出错\n替换内容\n${displayTitle}", e)
-                        appCtx.toastOnUi("${item.name}替换出错")
                     }
                 }
             }
@@ -171,7 +176,7 @@ data class BookChapter(
     }
 
     fun getAbsoluteURL(): String {
-        //二级目录解析的卷链接为空 返回目录页的链接
+        // 二级目录解析的卷链接为空 返回目录页的链接
         if (url.startsWith(title) && isVolume) return baseUrl
         val urlMatcher = AnalyzeUrl.paramPattern.matcher(url)
         val urlBefore = if (urlMatcher.find()) url.substring(0, urlMatcher.start()) else url
@@ -203,4 +208,3 @@ data class BookChapter(
         return String.format("%05d-%s.ttf", index, titleMD5)
     }
 }
-

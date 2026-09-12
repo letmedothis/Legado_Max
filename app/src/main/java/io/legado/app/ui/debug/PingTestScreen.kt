@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,10 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.legado.app.R
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.toastOnUi
@@ -69,29 +66,11 @@ fun PingTestScreen(
     var resolvedIp by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     
-    val topBarColors = pageTopBarColors()
     AppScaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                title = {
-                    Text(
-                        text = stringResource(R.string.debug_ping_test),
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.debug_ping_test),
+                onBackClick = onBackClick,
                 actions = {
                     IconButton(onClick = {
                         val clipText = clipboardManager.getText()?.text ?: ""
@@ -101,7 +80,7 @@ fun PingTestScreen(
                             context.toastOnUi(R.string.debug_clipboard_empty)
                         }
                     }) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "粘贴")
+                        Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
                     }
                     IconButton(onClick = {
                         host = ""
@@ -111,7 +90,7 @@ fun PingTestScreen(
                         resolvedIp = ""
                         currentProgress = 0
                     }) {
-                        Icon(Icons.Default.Clear, contentDescription = "清空")
+                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear))
                     }
                 }
             )

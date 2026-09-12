@@ -28,7 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,8 +48,7 @@ import io.legado.app.data.entities.DirectLinkUploadRule
 import io.legado.app.data.entities.UploadHistory
 import io.legado.app.data.entities.UploadHistoryWithRule
 import io.legado.app.ui.upload.DirectLinkUploadViewModel.*
-import io.legado.app.ui.theme.pageTopBarBackground
-import io.legado.app.ui.theme.pageTopBarColors
+import io.legado.app.ui.widget.components.AppPageTopBar
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.navigationBarBottomInset
 import io.legado.app.ui.widget.components.dialog.AppConfirmDialog
@@ -99,43 +97,23 @@ fun DirectLinkUploadScreen(
     val tabs = listOf("规则管理", "上传历史")
 
     // 主界面布局
-    val topBarColors = pageTopBarColors()
     AppScaffold(
         // 顶部应用栏
         topBar = {
-            TopAppBar(
-                modifier = Modifier.pageTopBarBackground(topBarColors),
-                title = {
-                    Text(
-                        text = "直链上传配置",
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                    )
-                },
-                // 顶部栏颜色配置
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                    navigationIconContentColor = topBarColors.contentColor,
-                    titleContentColor = topBarColors.contentColor,
-                    actionIconContentColor = topBarColors.contentColor
-                ),
-                // 导航图标(返回按钮)
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                    }
-                },
+            AppPageTopBar(
+                title = stringResource(R.string.direct_link_upload_config),
+                onBackClick = onBackClick,
                 // 操作按钮区域
                 actions = {
                     // 添加规则按钮
                     IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, "添加规则")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
                     }
                     // 更多操作菜单
                     var showMenu by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, "更多")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
                         }
                         // 下拉菜单
                         DropdownMenu(
@@ -144,7 +122,7 @@ fun DirectLinkUploadScreen(
                             containerColor = MaterialTheme.colorScheme.surface
                         ) {
                             DropdownMenuItem(
-                                text = { Text("粘贴规则") },
+                                text = { Text(stringResource(R.string.paste_rule)) },
                                 onClick = {
                                     showMenu = false
                                     val clip = clipboardManager.primaryClip
@@ -158,7 +136,7 @@ fun DirectLinkUploadScreen(
                                 leadingIcon = { Icon(Icons.Default.ContentPaste, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("导入默认规则") },
+                                text = { Text(stringResource(R.string.import_default_rule)) },
                                 onClick = { showImportDialog = true; showMenu = false },
                                 leadingIcon = { Icon(Icons.Default.CloudDownload, null) }
                             )

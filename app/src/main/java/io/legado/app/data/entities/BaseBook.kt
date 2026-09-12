@@ -4,7 +4,6 @@ import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.model.analyzeRule.RuleDataInterface
 import io.legado.app.utils.GSON
 import io.legado.app.utils.splitNotBlank
-import java.util.concurrent.ConcurrentHashMap
 
 interface BaseBook : RuleDataInterface {
     var name: String
@@ -32,17 +31,13 @@ interface BaseBook : RuleDataInterface {
         putVariable("custom", value)
     }
 
-    fun getCustomVariable(): String {
-        return getVariable("custom")
-    }
+    fun getCustomVariable(): String = getVariable("custom")
 
     override fun putBigVariable(key: String, value: String?) {
         RuleBigDataHelp.putBookVariable(bookUrl, key, value)
     }
 
-    override fun getBigVariable(key: String): String? {
-        return RuleBigDataHelp.getBookVariable(bookUrl, key)
-    }
+    override fun getBigVariable(key: String): String? = RuleBigDataHelp.getBookVariable(bookUrl, key)
 
     fun getKindList(): List<String> {
         val kindList = arrayListOf<String>()

@@ -175,7 +175,7 @@ class AudioPlayService : BaseService(),
                 }
 
                 IntentAction.stopPlay -> {
-                    AudioPlay.upReadTime()
+                    AudioPlay.flushReadTime()
                     exoPlayer.stop()
                     upPlayProgressJob?.cancel()
                     AudioPlay.status = Status.STOP
@@ -197,7 +197,7 @@ class AudioPlayService : BaseService(),
                 }
 
                 IntentAction.stop -> {
-                    AudioPlay.upReadTime()
+                    AudioPlay.flushReadTime()
                     pause = true
                     stopSelf()
                 }
@@ -208,7 +208,7 @@ class AudioPlayService : BaseService(),
 
     override fun onDestroy() {
         if (!pause) {
-            AudioPlay.upReadTime()
+            AudioPlay.flushReadTime()
         }
         super.onDestroy()
         if (useWakeLock) {
@@ -288,7 +288,7 @@ class AudioPlayService : BaseService(),
             wifiLock?.release()
         }
         try {
-            AudioPlay.upReadTime()
+            AudioPlay.flushReadTime()
             pause = true
             if (abandonFocus) {
                 abandonFocus()

@@ -130,13 +130,10 @@ class BookTagSelectDialog() : BaseDialogFragment(R.layout.dialog_book_tag_edit, 
                 onFinally.invoke()
             }
         }
-
     }
 
     interface Callback {
 
         fun setTags(tags: List<String>)
-
     }
-
 }

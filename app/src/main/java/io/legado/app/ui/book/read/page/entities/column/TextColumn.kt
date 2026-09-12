@@ -4,7 +4,6 @@ import android.graphics.Canvas
 import android.os.Build
 import androidx.annotation.Keep
 import io.legado.app.help.config.ReadBookConfig
-import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
@@ -109,5 +108,4 @@ data class TextColumn(
             canvas.drawText(charData, start, y, textPaint)
         }
     }
-
 }

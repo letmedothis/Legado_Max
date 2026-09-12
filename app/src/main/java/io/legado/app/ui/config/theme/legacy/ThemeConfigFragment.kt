@@ -14,9 +14,7 @@ import androidx.core.view.MenuProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import io.legado.app.R
-import io.legado.app.base.AppContextWrapper
 import io.legado.app.constant.AppConst
-import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogImageBlurringBinding
@@ -52,7 +50,6 @@ import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.inputStream
-import io.legado.app.utils.postEvent
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefString
 import io.legado.app.utils.readUri
@@ -64,7 +61,6 @@ import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.FileOutputStream
 
-
 /**
  * 主题配置 Fragment（旧版 PreferenceFragment 实现）。
  *
@@ -74,7 +70,8 @@ import java.io.FileOutputStream
  * 保留为兼容入口，新增/编辑主题列表的入口已迁移至 ThemeManageActivity（Compose 版）。
  */
 @Suppress("SameParameterValue")
-class ThemeConfigFragment : PreferenceFragment(),
+class ThemeConfigFragment :
+    PreferenceFragment(),
     SharedPreferences.OnSharedPreferenceChangeListener,
     MenuProvider {
 
@@ -219,7 +216,8 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.cAccent,
             PreferKey.cBackground,
             PreferKey.cBBackground,
-            PreferKey.tNavBar-> {
+            PreferKey.tNavBar,
+            -> {
                 upTheme(false)
             }
 
@@ -227,16 +225,17 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.cNAccent,
             PreferKey.cNBackground,
             PreferKey.cNBBackground,
-            PreferKey.tNavBarN -> {
+            PreferKey.tNavBarN,
+            -> {
                 upTheme(true)
             }
 
             PreferKey.bgImage,
-            PreferKey.bgImageN -> {
+            PreferKey.bgImageN,
+            -> {
                 upPreferenceSummary(key, getPrefString(key))
             }
         }
-
     }
 
     /**
@@ -280,7 +279,8 @@ class ThemeConfigFragment : PreferenceFragment(),
             "applicationThemeManage" -> startActivity<ApplicationThemeActivity>()
             "themeList" -> startActivity<ThemeManageActivity>()
             "saveDayTheme",
-            "saveNightTheme" -> alertSaveTheme(key)
+            "saveNightTheme",
+            -> alertSaveTheme(key)
 
             "coverConfig" -> startActivity<ConfigActivity> {
                 putExtra("configTag", ConfigTag.COVER_CONFIG)
@@ -344,7 +344,7 @@ class ThemeConfigFragment : PreferenceFragment(),
         val blurringKey = if (isNight) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring
         val actions = arrayListOf(
             getString(R.string.background_image_blurring),
-            getString(R.string.select_image)
+            getString(R.string.select_image),
         )
         if (!getPrefString(bgKey).isNullOrEmpty()) {
             actions.add(getString(R.string.delete))
@@ -395,7 +395,7 @@ class ThemeConfigFragment : PreferenceFragment(),
                     override fun onProgressChanged(
                         seekBar: SeekBar,
                         progress: Int,
-                        fromUser: Boolean
+                        fromUser: Boolean,
                     ) {
                         textViewValue.text = progress.toString()
                     }
@@ -431,7 +431,7 @@ class ThemeConfigFragment : PreferenceFragment(),
      * 发送重建事件以刷新所有 Activity。
      */
     private fun recreateActivities() {
-        postEvent(EventBus.RECREATE, "")
+        ThemeConfig.notifyRecreate()
     }
 
     /**
@@ -444,8 +444,9 @@ class ThemeConfigFragment : PreferenceFragment(),
     private fun upPreferenceSummary(preferenceKey: String, value: String? = null) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
-            PreferKey.barElevation -> preference.summary =
-                getString(R.string.bar_elevation_s, value)
+            PreferKey.barElevation ->
+                preference.summary =
+                    getString(R.string.bar_elevation_s, value)
 
             PreferKey.fontScale -> {
                 val fontScale = requireContext().getPrefInt(PreferKey.fontScale, 10)
@@ -453,7 +454,8 @@ class ThemeConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.bgImage,
-            PreferKey.bgImageN -> preference.summary = if (value.isNullOrBlank()) {
+            PreferKey.bgImageN,
+            -> preference.summary = if (value.isNullOrBlank()) {
                 getString(R.string.select_image)
             } else {
                 value
@@ -537,5 +539,4 @@ class ThemeConfigFragment : PreferenceFragment(),
             }
         }
     }
-
 }

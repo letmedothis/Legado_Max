@@ -40,7 +40,8 @@ import java.io.File
 /**
  * 字体选择对话框
  */
-class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
+class FontSelectDialog :
+    BaseDialogFragment(R.layout.dialog_font_select),
     Toolbar.OnMenuItemClickListener,
     FontAdapter.CallBack {
 
@@ -120,7 +121,7 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
                 val requireContext = requireContext()
                 alert(titleResource = R.string.system_typeface) {
                     items(
-                        requireContext.resources.getStringArray(R.array.system_typefaces).toList()
+                        requireContext.resources.getStringArray(R.array.system_typefaces).toList(),
                     ) { _, i ->
                         AppConfig.systemTypefaces = i
                         onDefaultFontChange()
@@ -157,7 +158,7 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
             .rationale(R.string.tip_perm_request_storage)
             .onGranted {
                 loadFontFiles(
-                    FileDoc.fromFile(File(path))
+                    FileDoc.fromFile(File(path)),
                 )
             }
             .request()
@@ -179,7 +180,7 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
 
     private fun mergeFontItems(
         items1: ArrayList<FileDoc>,
-        items2: ArrayList<FileDoc>
+        items2: ArrayList<FileDoc>,
     ): List<FileDoc> {
         val items = ArrayList(items1)
         items2.forEach { item2 ->

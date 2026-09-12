@@ -23,6 +23,7 @@ import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentStatePagerAdapter
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager.widget.ViewPager
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -84,11 +85,8 @@ import io.legado.app.utils.visible
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.DevicePerformanceUtils
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.externalFiles
-import io.legado.app.utils.FileUtils
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.getPrefInt
-import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -98,7 +96,6 @@ import kotlin.coroutines.resume
 import androidx.core.graphics.drawable.toDrawable
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.ui.about.UpdateDialog
-import java.io.File
 import io.legado.app.utils.StringUtils
 import io.legado.app.utils.clearClip
 import io.legado.app.utils.getClipText
@@ -108,7 +105,8 @@ import kotlin.time.Duration.Companion.hours
  * 主界面
  */
 @Suppress("PrivatePropertyName")
-class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
+class MainActivity :
+    VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     BottomNavigationView.OnNavigationItemSelectedListener,
     BottomNavigationView.OnNavigationItemReselectedListener,
     MainViewModel.CallBack {
@@ -138,8 +136,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private var onUpBooksBadgeView: BadgeView? = null
     private var bottomNavigationConfigSignature: String? = null
     private var bottomNavigationInset = 0
+
     /** 背景图签名缓存，配合 [currentBackgroundSignature] 避免每次 onResume 重复解码 */
     private var backgroundImageSignature: String? = null
+
     /** 背景是否至少应用过一次（区分“尚未初始化”与“签名匹配跳过”） */
     private var backgroundImageApplied = false
 
@@ -155,7 +155,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     /**
-     * 重写背景更新方法，在父类设置 decorView 背景后，将相同背景同步到 content_container。
+     * 重写背景更新方法，在父类异步加载完成背景后，将相同背景同步到 content_container。
      *
      * 原因：底栏的玻璃/磨砂效果（[StableLiquidGlassView]）通过 [LiquidGlass] 采样
      * content_container 的像素来实现实时模糊。而 [LiquidGlass] 的采样机制是调用
@@ -175,8 +175,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
      * 应改为在此处合并而非覆盖，或改用其他容器作为采样源。
      *
      * 其他注意点：
-     * - imageBg 关闭时 decorView 背景为 null，此处会将 content_container 背景同步为 null，
-     *   即清除其背景，不会遗留旧的背景图。
+     * - 背景图解码在子线程异步执行，回调 [onBackgroundDrawableLoaded] 在主线程触发后
+     *   才同步 content_container；decode 失败或无背景图配置时 drawable 为 null，
+     *   会将 content_container 背景同步为 null（清除背景，不遗留旧背景图）。
      * - mutate() 仅克隆 Drawable 状态对象，底层像素（bitmap/constantState）仍与 decorView
      *   共享，不会因双份背景导致像素内存翻倍，仅额外占用一份轻量状态对象。
      */
@@ -188,44 +189,26 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             return
         }
         backgroundImageSignature = signature
+        // 注意：背景解码是异步的，super 返回时背景尚未生效，
+        // content_container 的同步统一在 onBackgroundDrawableLoaded 回调中完成
         super.upBackgroundImage()
-        // 将 decorView 的当前背景同步到 content_container
+    }
+
+    override fun onBackgroundDrawableLoaded(drawable: Drawable?) {
+        super.onBackgroundDrawableLoaded(drawable)
+        // 将加载完成的背景同步到 content_container
         // 使用 constantState?.newDrawable()?.mutate() 创建独立副本，
         // 避免两个 View 共享同一 Drawable 状态导致绘制冲突
-        val decorBg = window.decorView.background
         // 注意：此处会无条件覆盖 content_container 背景，详见上方约束说明
-        binding.contentContainer.background = decorBg?.constantState?.newDrawable()?.mutate()
+        binding.contentContainer.background = drawable?.constantState?.newDrawable()?.mutate()
         backgroundImageApplied = true
     }
 
     /**
-     * 计算当前主题背景的签名，取图逻辑与 [ThemeConfig.getBgImage] 保持一致。
-     * 纳入主题模式（日/夜）、背景路径、文件最后修改时间与大小、模糊强度，
-     * 任一变化都会使签名不同而触发重新解码。
+     * 计算当前主题背景的签名，统一委托 [ThemeConfig.getBackgroundSignature]，
+     * 与 BaseActivity 的进程级背景缓存使用同一口径。
      */
-    private fun currentBackgroundSignature(): String? {
-        val night = AppConfig.isNightTheme
-        val prefKey = if (night) PreferKey.bgImageN else PreferKey.bgImage
-        val rawPath = getPrefString(prefKey).orEmpty()
-        if (rawPath.isBlank()) return "bg:$prefKey:empty"
-        // 与 getBgImage 相同：在线背景需先落到缓存文件，仅文件名的需拼接完整路径
-        val path = if (rawPath.startsWith("http")) {
-            val filePath = FileUtils.getPath(externalFiles, prefKey, ThemeConfig.getUrlToFile(rawPath))
-            if (FileUtils.exist(filePath)) filePath else null
-        } else if (!rawPath.contains(File.separator)) {
-            val filePath = FileUtils.getPath(externalFiles, prefKey, rawPath)
-            if (FileUtils.exist(filePath)) filePath else null
-        } else {
-            rawPath
-        }
-        if (path == null) return "bg:$prefKey:missing:$rawPath"
-        val blurring = getPrefInt(
-            if (night) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring,
-            0
-        )
-        val file = File(path)
-        return "bg:$prefKey:${file.absolutePath}:${file.lastModified()}:${file.length()}:$blurring"
-    }
+    private fun currentBackgroundSignature(): String = ThemeConfig.getBackgroundSignature(this)
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         // 清理已销毁 Fragment 的引用，避免 fragmentMap 持有导致内存泄漏
@@ -234,7 +217,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 override fun onFragmentDestroyed(fm: FragmentManager, fragment: Fragment) {
                     fragmentMap.entries.removeIf { it.value === fragment }
                 }
-            }, true
+            },
+            true,
         )
         upBottomMenu()
         initView()
@@ -271,25 +255,25 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         lifecycleScope.launch {
-            //隐私协议
+            // 隐私协议
             if (!privacyPolicy()) return@launch
-            //版本更新
+            // 版本更新
             upVersion()
-            //设置本地密码
+            // 设置本地密码
             setLocalPassword()
             notifyAppCrash()
-            //备份同步
+            // 备份同步
             backupSync()
-            //设置回调
+            // 设置回调
             viewModel.setActivityCallback(this@MainActivity)
-            //自动更新书源
+            // 自动更新书源
             binding.viewPagerMain.postDelayed(1000) {
                 viewModel.ruleSubsUp()
             }
-            //自动更新书籍
+            // 自动更新书籍
             val isAutoRefreshedBook = savedInstanceState?.getBoolean("isAutoRefreshedBook") ?: false
             if (AppConfig.autoRefreshBook && !isAutoRefreshedBook) {
-                //每次进入书架后5秒自动更新书籍目录
+                // 每次进入书架后5秒自动更新书籍目录
                 binding.viewPagerMain.postDelayed(5000) {
                     viewModel.upAllBookToc()
                 }
@@ -393,7 +377,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                     AppUpdate.giteeUpdate.check(lifecycleScope)
                         .onSuccess {
                             showDialogFragment(
-                                UpdateDialog(it)
+                                UpdateDialog(it),
                             )
                         }
                     LocalConfig.lastCheckUpdate = System.currentTimeMillis()
@@ -522,6 +506,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         // 或 recreate() 可能被 upSort() 异常阻断。
         // 在 onResume 中直接刷新背景图片，确保主题背景变更立即生效。
         upBackgroundImage()
+        // 后台期间积压的 RECREATE 在此重建，保证只在本页回到前台时发生一次
+        if (recreateOnResume) {
+            recreateOnResume = false
+            recreate()
+        }
         // 签名缓存已修复内置配置时间戳问题，无需 force = true；
         // 若配置确实变更，签名不同会自动触发刷新；若未变更则跳过，避免重复重建。
         refreshBottomNavigationConfig(force = false)
@@ -550,6 +539,12 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             binding.bottomNavigationGlassView.release()
         }
     }
+
+    /**
+     * 后台收到 RECREATE 时置位，回到前台 onResume 时再重建。
+     * 避免应用主题时本页与前台页面在同一主线程并发重建窗口（见 docs/archive/主题列表应用主题后UI卡死根因分析）。
+     */
+    private var recreateOnResume = false
 
     /**
      * 如果重启太快fragment不会重建,这里更新一下书架的排序
@@ -581,9 +576,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             onUpBooksBadgeView!!.setBadgeCount(it)
         }
         observeEvent<String>(EventBus.RECREATE) {
-            // 先直接刷新背景（即使 recreate 失败或被跳过也能生效）
-            upBackgroundImage()
-            recreate()
+            if (lifecycle.currentState == Lifecycle.State.RESUMED) {
+                // 前台：直接刷新背景并重建（即使 recreate 失败或被跳过也能生效）
+                upBackgroundImage()
+                recreate()
+            } else {
+                // 后台：延后到 onResume 重建，避免与前台页面并发重建窗口
+                recreateOnResume = true
+            }
         }
         observeEvent<Boolean>(EventBus.NOTIFY_MAIN) {
             binding.apply {
@@ -700,47 +700,39 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             val menuItemId = fragmentIdToMenuItemId(fragmentId)
             binding.bottomNavigationView.menu.findItem(menuItemId)?.isChecked = true
         }
-
     }
 
     @Suppress("DEPRECATION")
-    private inner class TabFragmentPageAdapter(fm: FragmentManager) :
-        FragmentStatePagerAdapter(fm, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT) {
+    private inner class TabFragmentPageAdapter(fm: FragmentManager) : FragmentStatePagerAdapter(fm, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT) {
 
-        private fun getId(position: Int): Int {
-            return getFragmentId(position)
-        }
+        private fun getId(position: Int): Int = getFragmentId(position)
 
         override fun getItemPosition(any: Any): Int {
             val position = (any as MainFragmentInterface).position
                 ?: return POSITION_NONE
             val fragmentId = getId(position)
-            if ((fragmentId == idBookshelf1 && any is BookshelfFragment1)
-                || (fragmentId == idBookshelf2 && any is BookshelfFragment2)
-                || (fragmentId == idHomepage && any is HomepageFragment)
-                || (fragmentId == idExplore && any is ExploreFragment)
-                || (fragmentId == idRss && any is RssFragment)
-                || (fragmentId == idMy && any is MyFragment)
+            if ((fragmentId == idBookshelf1 && any is BookshelfFragment1) ||
+                (fragmentId == idBookshelf2 && any is BookshelfFragment2) ||
+                (fragmentId == idHomepage && any is HomepageFragment) ||
+                (fragmentId == idExplore && any is ExploreFragment) ||
+                (fragmentId == idRss && any is RssFragment) ||
+                (fragmentId == idMy && any is MyFragment)
             ) {
                 return POSITION_UNCHANGED
             }
             return POSITION_NONE
         }
 
-        override fun getItem(position: Int): Fragment {
-            return when (getId(position)) {
-                idBookshelf1 -> BookshelfFragment1(position)
-                idBookshelf2 -> BookshelfFragment2(position)
-                idHomepage -> HomepageFragment(position)
-                idExplore -> ExploreFragment(position)
-                idRss -> RssFragment(position)
-                else -> MyFragment(position)
-            }
+        override fun getItem(position: Int): Fragment = when (getId(position)) {
+            idBookshelf1 -> BookshelfFragment1(position)
+            idBookshelf2 -> BookshelfFragment2(position)
+            idHomepage -> HomepageFragment(position)
+            idExplore -> ExploreFragment(position)
+            idRss -> RssFragment(position)
+            else -> MyFragment(position)
         }
 
-        override fun getCount(): Int {
-            return bottomMenuCount
-        }
+        override fun getCount(): Int = bottomMenuCount
 
         override fun instantiateItem(container: ViewGroup, position: Int): Any {
             var fragment = super.instantiateItem(container, position) as Fragment
@@ -751,19 +743,18 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             fragmentMap[getId(position)] = fragment
             return fragment
         }
-
     }
 
-    override fun openImportUi(type:Int, source: String) {
+    override fun openImportUi(type: Int, source: String) {
         when (type) {
             0 -> showDialogFragment(
-                ImportBookSourceDialog(source)
+                ImportBookSourceDialog(source),
             )
             1 -> showDialogFragment(
-                ImportRssSourceDialog(source)
+                ImportRssSourceDialog(source),
             )
             2 -> showDialogFragment(
-                ImportReplaceRuleDialog(source)
+                ImportReplaceRuleDialog(source),
             )
         }
     }
@@ -853,7 +844,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             bottomNavigationView.menu,
             this@MainActivity,
             AppConfig.isNightTheme,
-            bgColor
+            bgColor,
         )
         if (hasCustomIcons) {
             bottomNavigationView.itemIconTintList = null
@@ -886,13 +877,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     /** 解析底栏边框颜色 */
-    private fun resolveBottomNavigationBorderColor(config: NavigationBarConfig): Int? {
-        return config.borderColor?.let {
-            if (Color.alpha(it) == 0) {
-                Color.TRANSPARENT
-            } else {
-                ColorUtils.withAlpha(it, config.borderAlpha.coerceIn(0, 100) / 100f)
-            }
+    private fun resolveBottomNavigationBorderColor(config: NavigationBarConfig): Int? = config.borderColor?.let {
+        if (Color.alpha(it) == 0) {
+            Color.TRANSPARENT
+        } else {
+            ColorUtils.withAlpha(it, config.borderAlpha.coerceIn(0, 100) / 100f)
         }
     }
 
@@ -930,7 +919,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             if (floating) 6.dpToPx() else 0,
             0,
             if (floating) 6.dpToPx() else 0,
-            if (standard) bottomNavigationInset else 0
+            if (standard) bottomNavigationInset else 0,
         )
         bottomNavigationView.alpha = 1f
         bottomNavigationView.elevation = 0f
@@ -986,7 +975,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                     cornerRadius = if (floating) 24f.dpToPx() else 0f,
                     effectMode = config.effectMode,
                     bgColor = bgColor,
-                    strokeColor = resolveBottomNavigationBorderColor(config)
+                    strokeColor = resolveBottomNavigationBorderColor(config),
                 )
             }
         } else {
@@ -1019,7 +1008,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         liquidGlassView: StableLiquidGlassView,
         config: NavigationBarConfig,
         cornerRadius: Float,
-        bgColor: Int
+        bgColor: Int,
     ) {
         val level = config.opacity.coerceIn(0, 100) / 100f
         val frosted = config.effectMode == NavigationBarConfig.EFFECT_FROSTED
@@ -1062,7 +1051,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         cornerRadius: Float,
         effectMode: String,
         bgColor: Int,
-        strokeColor: Int?
+        strokeColor: Int?,
     ): GradientDrawable {
         val baseColor = Color.rgb(Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor))
         val isLight = ColorUtils.isColorLight(baseColor)
@@ -1070,7 +1059,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         val surfaceColor = ColorUtils.blendColors(
             baseColor,
             neutralSurface,
-            if (effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.26f else 0.14f
+            if (effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.26f else 0.14f,
         )
         val fallbackBoost = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) 0.08f else 0f
         val frosted = effectMode == NavigationBarConfig.EFFECT_FROSTED
@@ -1099,8 +1088,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             intArrayOf(
                 ColorUtils.withAlpha(surfaceColor, startAlpha),
                 ColorUtils.withAlpha(surfaceColor, centerAlpha),
-                ColorUtils.withAlpha(surfaceColor, endAlpha)
-            )
+                ColorUtils.withAlpha(surfaceColor, endAlpha),
+            ),
         ).apply {
             shape = GradientDrawable.RECTANGLE
             setCornerRadius(cornerRadius)
@@ -1125,7 +1114,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             setColor(bgColor)
             setStroke(
                 if (!standard && strokeColor != null) 1.dpToPx() else 0,
-                strokeColor ?: Color.TRANSPARENT
+                strokeColor ?: Color.TRANSPARENT,
             )
         }
     }
@@ -1135,13 +1124,13 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         config: NavigationBarConfig,
         bgColor: Int,
         radius: Float,
-        strokeColor: Int?
+        strokeColor: Int?,
     ): Drawable {
         val opacityFactor = config.opacity.coerceIn(0, 100) / 100f
         val glassBase = glassBaseColor(bgColor, config.effectMode, opacityFactor)
         val body = roundedGradient(
             radius = radius,
-            colors = bottomNavigationMaterialColors(glassBase, config.effectMode)
+            colors = bottomNavigationMaterialColors(glassBase, config.effectMode),
         )
         val mist = roundedGradient(
             radius = radius,
@@ -1149,25 +1138,25 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 Color.TRANSPARENT,
                 adjustAlpha(
                     if (ColorUtils.isColorLight(glassBase)) Color.WHITE else Color.rgb(90, 110, 136),
-                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.34f else 0.08f
+                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.34f else 0.08f,
                 ),
-                Color.TRANSPARENT
-            )
+                Color.TRANSPARENT,
+            ),
         )
         val highlight = roundedGradient(
             radius = radius,
             colors = intArrayOf(
                 adjustAlpha(
                     getCompatColor(R.color.glass_bar_highlight),
-                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.36f else 1.00f
+                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.36f else 1.00f,
                 ),
                 adjustAlpha(Color.WHITE, opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.06f else 0.20f),
                 Color.TRANSPARENT,
                 adjustAlpha(
                     getCompatColor(R.color.glass_overlay),
-                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.18f else 0.72f
-                )
-            )
+                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.18f else 0.72f,
+                ),
+            ),
         )
         val bottomShade = roundedGradient(
             radius = radius,
@@ -1176,9 +1165,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 Color.TRANSPARENT,
                 adjustAlpha(
                     if (ColorUtils.isColorLight(glassBase)) Color.rgb(20, 34, 54) else Color.BLACK,
-                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.06f else 0.18f
-                )
-            )
+                    opacityFactor * if (config.effectMode == NavigationBarConfig.EFFECT_FROSTED) 0.06f else 0.18f,
+                ),
+            ),
         )
         val border = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
@@ -1186,7 +1175,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             setColor(Color.TRANSPARENT)
             setStroke(
                 1.dpToPx(),
-                strokeColor ?: adjustAlpha(getCompatColor(R.color.glass_stroke), opacityFactor)
+                strokeColor ?: adjustAlpha(getCompatColor(R.color.glass_stroke), opacityFactor),
             )
         }
         val shadow = GradientDrawable().apply {
@@ -1220,20 +1209,16 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     /** 创建圆角渐变 Drawable */
-    private fun roundedGradient(radius: Float, colors: IntArray): GradientDrawable {
-        return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors).apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = radius
-        }
+    private fun roundedGradient(radius: Float, colors: IntArray): GradientDrawable = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors).apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = radius
     }
 
     /** 调整颜色的 Alpha 通道 */
-    private fun adjustAlpha(color: Int, factor: Float): Int {
-        return ColorUtils.withAlpha(
-            Color.rgb(Color.red(color), Color.green(color), Color.blue(color)),
-            (Color.alpha(color) / 255f * factor).coerceIn(0f, 1f)
-        )
-    }
+    private fun adjustAlpha(color: Int, factor: Float): Int = ColorUtils.withAlpha(
+        Color.rgb(Color.red(color), Color.green(color), Color.blue(color)),
+        (Color.alpha(color) / 255f * factor).coerceIn(0f, 1f),
+    )
 
     /** 根据效果模式生成底栏材质渐变色数组 */
     private fun bottomNavigationMaterialColors(bgColor: Int, effectMode: String): IntArray {
@@ -1245,14 +1230,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 ColorUtils.blendColors(
                     ColorUtils.withAlpha(rgb, (alpha * 0.98f).coerceIn(0f, 1f)),
                     ColorUtils.withAlpha(frost, (alpha * 0.38f).coerceIn(0f, 1f)),
-                    0.48f
+                    0.48f,
                 ),
                 ColorUtils.blendColors(
                     ColorUtils.withAlpha(rgb, (alpha * 0.94f).coerceIn(0f, 1f)),
                     ColorUtils.withAlpha(frost, (alpha * 0.25f).coerceIn(0f, 1f)),
-                    0.36f
+                    0.36f,
                 ),
-                ColorUtils.withAlpha(rgb, (alpha * 0.86f).coerceIn(0f, 1f))
+                ColorUtils.withAlpha(rgb, (alpha * 0.86f).coerceIn(0f, 1f)),
             )
         } else {
             val highlight = if (ColorUtils.isColorLight(rgb)) Color.WHITE else Color.rgb(56, 74, 96)
@@ -1260,14 +1245,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 ColorUtils.blendColors(
                     ColorUtils.withAlpha(rgb, (alpha * 0.76f).coerceIn(0f, 1f)),
                     ColorUtils.withAlpha(highlight, 0.34f),
-                    0.58f
+                    0.58f,
                 ),
                 ColorUtils.withAlpha(rgb, (alpha * 0.56f).coerceIn(0f, 1f)),
                 ColorUtils.blendColors(
                     ColorUtils.withAlpha(rgb, (alpha * 0.40f).coerceIn(0f, 1f)),
                     ColorUtils.withAlpha(Color.WHITE, 0.10f),
-                    0.18f
-                )
+                    0.18f,
+                ),
             )
         }
     }
@@ -1349,7 +1334,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
      */
     private fun importShibboleth(text: String) {
         try {
-            this@MainActivity.clearClip() //清理一下防重复
+            this@MainActivity.clearClip() // 清理一下防重复
             val (url, type, customWord) = StringUtils.unShibboleth(text)
             when (type) {
                 StringUtils.BOOK_SOURCE ->
@@ -1370,5 +1355,4 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             e.printOnDebug()
         }
     }
-
 }

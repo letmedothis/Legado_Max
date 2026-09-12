@@ -43,8 +43,9 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.BookshelfMatcher
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
-import io.legado.app.help.config.ThemeConfig.applyDayNight
 import io.legado.app.help.config.ThemeConfig.applyDayNightInit
+import io.legado.app.help.config.ThemeConfig.applyTheme
+import io.legado.app.help.config.ThemeConfig.notifyRecreate
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.Cronet
 import io.legado.app.help.http.ObsoleteUrlFactory
@@ -79,7 +80,7 @@ class App : Application() {
         if (isDebuggable) {
             ThreadUtils.setThreadAssertsDisabledForTesting(true)
         }
-        //初始化 Timber 日志框架
+        // 初始化 Timber 日志框架
         TimberLog.init(this, isDebuggable)
         oldConfig = Configuration(resources.configuration)
         applyDayNightInit(this)
@@ -91,26 +92,26 @@ class App : Application() {
             LogUtils.init(this@App)
             LogUtils.d("App", "onCreate")
             LogUtils.logDeviceInfo()
-            //预下载Cronet so
+            // 预下载Cronet so
             Cronet.preDownload()
             createNotificationChannels()
             // LiveEventBus 全局配置：基于 LiveData 的事件总线，用于跨组件通信
             LiveEventBus.config()
-                .lifecycleObserverAlwaysActive(true)    // 观察者始终活跃，不受 Lifecycle 状态限制（后台也能收到事件）
-                .autoClear(false)                       // 不自动清除粘性事件，新订阅者仍可收到最近一次事件
+                .lifecycleObserverAlwaysActive(true) // 观察者始终活跃，不受 Lifecycle 状态限制（后台也能收到事件）
+                .autoClear(false) // 不自动清除粘性事件，新订阅者仍可收到最近一次事件
                 .enableLogger(BuildConfig.DEBUG || AppConfig.recordLog)
-                .setLogger(EventLogger())               // 将 LiveEventBus 日志桥接到项目 LogUtils
+                .setLogger(EventLogger()) // 将 LiveEventBus 日志桥接到项目 LogUtils
             DefaultData.upVersion()
             AppFreezeMonitor.init(this@App)
             DispatchersMonitor.init()
             URL.setURLStreamHandlerFactory(ObsoleteUrlFactory(okHttpClient))
             launch { installGmsTlsProvider(appCtx) }
             initRhino()
-            //初始化封面
+            // 初始化封面
             BookCover.toString()
-            //初始化书架匹配器（轻量查询，全局共享）
+            // 初始化书架匹配器（轻量查询，全局共享）
             BookshelfMatcher.start()
-            //清除过期数据
+            // 清除过期数据
             appDb.cacheDao.clearDeadline(System.currentTimeMillis())
             if (getPrefBoolean(PreferKey.autoClearExpired, true)) {
                 val clearTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)
@@ -122,7 +123,7 @@ class App : Application() {
             SourceRecycleBinHelp.cleanupExpired()
             ReadBookConfig.clearBgAndCache()
 //            ThemeConfig.clearBg() //每次手动切换主题时清理多余图片
-            //初始化简繁转换引擎
+            // 初始化简繁转换引擎
             when (AppConfig.chineseConverterType) {
                 1 -> {
                     ChineseUtils.fixT2sDict()
@@ -131,9 +132,9 @@ class App : Application() {
 
                 2 -> ChineseUtils.preLoad(true, TransType.SIMPLE_TO_TRADITIONAL)
             }
-            //调整排序序号
+            // 调整排序序号
             SourceHelp.adjustSortNumber()
-            //同步阅读记录
+            // 同步阅读记录
             if (AppConfig.syncBookProgress) {
                 AppWebDav.downloadAllBookProgress()
             }
@@ -148,7 +149,10 @@ class App : Application() {
         super.onConfigurationChanged(newConfig)
         val diff = newConfig.diff(oldConfig)
         if ((diff and ActivityInfo.CONFIG_UI_MODE) != 0) {
-            applyDayNight(this)
+            // 模式此时已生效，不能再次 setDefaultNightMode/applyDayNight，
+            // 否则会再次触发配置变化，形成「RECREATE 广播风暴」（见 docs/archive/主题列表应用主题后UI卡死根因分析）
+            applyTheme(this)
+            notifyRecreate()
         }
         oldConfig = Configuration(newConfig)
     }
@@ -175,7 +179,7 @@ class App : Application() {
             }
             val gms = context.createPackageContext(
                 gmsPackageName,
-                CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY
+                CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY,
             )
             gms.classLoader
                 .loadClass("com.google.android.gms.common.security.ProviderInstallerImpl")
@@ -194,7 +198,7 @@ class App : Application() {
         val downloadChannel = NotificationChannel(
             channelIdDownload,
             getString(R.string.action_download),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             enableLights(false)
             enableVibration(false)
@@ -205,7 +209,7 @@ class App : Application() {
         val readAloudChannel = NotificationChannel(
             channelIdReadAloud,
             getString(R.string.read_aloud),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             enableLights(false)
             enableVibration(false)
@@ -216,7 +220,7 @@ class App : Application() {
         val webChannel = NotificationChannel(
             channelIdWeb,
             getString(R.string.web_service),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             enableLights(false)
             enableVibration(false)
@@ -224,13 +228,13 @@ class App : Application() {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
 
-        //向notification manager 提交channel
+        // 向notification manager 提交channel
         notificationManager.createNotificationChannels(
             listOf(
                 downloadChannel,
                 readAloudChannel,
-                webChannel
-            )
+                webChannel,
+            ),
         )
     }
 
@@ -271,5 +275,4 @@ class App : Application() {
             }
         }
     }
-
 }

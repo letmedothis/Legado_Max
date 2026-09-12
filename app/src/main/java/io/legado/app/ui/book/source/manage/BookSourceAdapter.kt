@@ -199,6 +199,7 @@ class BookSourceAdapter(
 
                 R.id.menu_search -> callBack.searchBook(source)
                 R.id.menu_debug_source -> callBack.debug(source)
+
                 R.id.menu_del -> {
                     callBack.del(source)
                     selected.remove(source)

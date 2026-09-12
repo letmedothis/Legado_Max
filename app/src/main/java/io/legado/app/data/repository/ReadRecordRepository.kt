@@ -5,6 +5,7 @@ import io.legado.app.data.dao.ReadRecordDao
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.entities.readRecord.ReadRecordSessionDisplay
 import io.legado.app.data.entities.readRecord.ReadRecordSource
 import io.legado.app.data.entities.readRecord.ReadRecordTimelineDay
 import io.legado.app.constant.AppConst
@@ -26,7 +27,7 @@ class ReadRecordRepository(
     private val currentDeviceIdProvider: () -> String = { AppConst.androidId }
 ) {
     companion object {
-        const val CURRENT_REPAIR_VERSION = 4
+        const val CURRENT_REPAIR_VERSION = 5
 
         /** 相邻阅读片段的会话合并阈值（毫秒）：间隔 ≤ 20 分钟视为同一次阅读，与时间线视图 mergeContinuousSessions 口径一致 */
         const val SESSION_MERGE_GAP = 20 * 60 * 1000L
@@ -213,35 +214,60 @@ class ReadRecordRepository(
             sessions
                 .groupBy { dateFormat.format(Date(it.startTime)) }
                 .mapValues { (_, daySessions) ->
-                    mergeCloseSessions(daySessions).sortedByDescending { it.startTime }
+                    ReadRecordTimelineDay(
+                        date = dateFormat.format(Date(daySessions.minOf { it.startTime })),
+                        sessions = mergeCloseSessions(daySessions)
+                            .sortedByDescending { it.session.startTime },
+                        readTime = daySessions.sumOf {
+                            (it.endTime - it.startTime).coerceAtLeast(0L)
+                        },
+                    )
                 }
                 .toSortedMap(compareByDescending { it })
-                .map { (date, daySessions) ->
-                    ReadRecordTimelineDay(date = date, sessions = daySessions)
-                }
+                .map { (_, day) -> day }
         }
     }
 
     /**
      * 合并同一天内间隔 ≤ [SESSION_MERGE_GAP] 的相邻会话（翻页高频上报产生的碎片）。
      */
-    private fun mergeCloseSessions(sessions: List<ReadRecordSession>): List<ReadRecordSession> {
+    private fun mergeCloseSessions(
+        sessions: List<ReadRecordSession>,
+        gap: Long = SESSION_MERGE_GAP,
+    ): List<ReadRecordSessionDisplay> {
         if (sessions.isEmpty()) return emptyList()
         val sorted = sessions.sortedBy { it.startTime }
-        val merged = mutableListOf<ReadRecordSession>()
-        merged.add(sorted.first().copy())
+        val merged = mutableListOf<ReadRecordSessionDisplay>()
+        val first = sorted.first()
+        merged.add(
+            ReadRecordSessionDisplay(
+                session = first.copy(),
+                readTime = (first.endTime - first.startTime).coerceAtLeast(0L),
+            ),
+        )
         for (i in 1 until sorted.size) {
             val current = sorted[i]
             val last = merged.last()
-            if ((current.startTime - last.endTime) <= SESSION_MERGE_GAP) {
+            if (current.source == last.session.source &&
+                (current.startTime - last.session.endTime) <= gap
+            ) {
                 merged[merged.lastIndex] = last.copy(
-                    endTime = max(current.endTime, last.endTime),
-                    words = last.words + current.words,
-                    // 章节名取最新碎片：连续阅读时碎片会不断合并，必须跟随最后读到的章节
-                    durChapterTitle = current.durChapterTitle.ifBlank { last.durChapterTitle }
+                    session = last.session.copy(
+                        endTime = max(current.endTime, last.session.endTime),
+                        words = last.session.words + current.words,
+                        durChapterTitle = current.durChapterTitle
+                            .ifBlank { last.session.durChapterTitle },
+                    ),
+                    readTime = last.readTime +
+                        (current.endTime - current.startTime).coerceAtLeast(0L),
                 )
             } else {
-                merged.add(current.copy())
+                merged.add(
+                    ReadRecordSessionDisplay(
+                        session = current.copy(),
+                        readTime = (current.endTime - current.startTime).coerceAtLeast(0L),
+                    ),
+                )
             }
         }
         return merged
@@ -645,7 +671,30 @@ class ReadRecordRepository(
         cleanupBlankBookNameData()
         fixEmptyAuthors(getAuthorByBookName)
         normalizeDuplicateDeviceRecords()
+        compactSessions()
         rebuildAggregateRecordsFromHistory()
+    }
+
+    /** 压缩旧版本逐页写入产生的连续会话碎片，同时保持来源隔离。 */
+    suspend fun compactSessions() = withContext(Dispatchers.IO) {
+        dao.getDistinctSessionIdentities().forEach { identity ->
+            val sessions = dao.getSessionsByBook(
+                identity.deviceId,
+                identity.bookName,
+                identity.bookAuthor,
+                identity.source,
+            )
+            if (sessions.size <= 1) return@forEach
+            val merged = sessions
+                .groupBy { dateFormat.format(Date(it.startTime)) }
+                .flatMap { (_, daySessions) -> mergeCloseSessions(daySessions, gap = 0L) }
+            if (merged.size < sessions.size) {
+                val mergedSessions = merged.map { it.session }
+                dao.insertAllSessions(mergedSessions)
+                val mergedIds = mergedSessions.map { it.id }.toSet()
+                dao.deleteSessionsByIds(sessions.map { it.id }.filter { it !in mergedIds })
+            }
+        }
     }
 
     suspend fun cleanupBlankBookNameData() {
@@ -845,7 +894,8 @@ class ReadRecordRepository(
         val existing = dao.getReadRecord(
             normalized.deviceId,
             normalized.bookName,
-            normalized.bookAuthor
+            normalized.bookAuthor,
+            normalized.source,
         )
         if (existing == null || existing.readTime < normalized.readTime) {
             dao.insert(normalized)
@@ -859,7 +909,8 @@ class ReadRecordRepository(
             normalized.deviceId,
             normalized.bookName,
             normalized.bookAuthor,
-            normalized.date
+            normalized.date,
+            normalized.source,
         )
         if (existing == null || existing.readTime < normalized.readTime) {
             dao.insertDetail(normalized)
@@ -890,24 +941,26 @@ class ReadRecordRepository(
      */
     private suspend fun rebuildImportedBookTotalsFast() {
         val currentDeviceId = getCurrentDeviceId()
-        val allRecords = dao.all.associateBy { it.bookName to it.bookAuthor }
+        val allRecords = dao.all.associateBy {
+            RecordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source)
+        }
         val detailsByBook = dao.getAllDetailsList()
             .filter { it.deviceId == currentDeviceId }
-            .groupBy { it.bookName to it.bookAuthor }
+            .groupBy { RecordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source) }
         val sessionsByBook = dao.getAllSessionsList()
             .filter { it.deviceId == currentDeviceId }
-            .groupBy { it.bookName to it.bookAuthor }
+            .groupBy { RecordIdentity(it.deviceId, it.bookName, it.bookAuthor, it.source) }
 
-        val allBookKeys = mutableSetOf<Pair<String, String>>()
+        val allBookKeys = mutableSetOf<RecordIdentity>()
         allBookKeys.addAll(allRecords.keys)
         allBookKeys.addAll(detailsByBook.keys)
         allBookKeys.addAll(sessionsByBook.keys)
 
         val toUpsert = mutableListOf<ReadRecord>()
-        for ((bookName, bookAuthor) in allBookKeys) {
-            val bookSessions = sessionsByBook[bookName to bookAuthor].orEmpty()
-            val bookDetails = detailsByBook[bookName to bookAuthor].orEmpty()
-            val existingRecord = allRecords[bookName to bookAuthor]
+        for (identity in allBookKeys) {
+            val bookSessions = sessionsByBook[identity].orEmpty()
+            val bookDetails = detailsByBook[identity].orEmpty()
+            val existingRecord = allRecords[identity]
 
             val sessionTotalTime = bookSessions.sumOf { it.endTime - it.startTime }
             val detailTotalTime = bookDetails.sumOf { it.readTime }
@@ -927,8 +980,9 @@ class ReadRecordRepository(
                 toUpsert.add(
                     ReadRecord(
                         deviceId = currentDeviceId,
-                        bookName = bookName,
-                        bookAuthor = bookAuthor,
+                        bookName = identity.bookName,
+                        bookAuthor = identity.bookAuthor,
+                        source = identity.source,
                         readTime = totalTime,
                         lastRead = lastRead
                     )

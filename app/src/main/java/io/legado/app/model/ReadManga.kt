@@ -8,10 +8,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.BookSource
-import io.legado.app.data.entities.readRecord.ReadRecord
-import io.legado.app.data.entities.readRecord.ReadRecordSession
 import io.legado.app.data.entities.readRecord.ReadRecordSource
-import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.BookHelp
@@ -60,8 +57,6 @@ object ReadManga : CoroutineScope by MainScope() {
     var nextMangaChapter: MangaChapter? = null
     var bookSource: BookSource? = null
     var readStartTime: Long = System.currentTimeMillis()
-    private val readRecord = ReadRecord()
-    private var sessionStartTime = 0L
     private val loadingChapters = arrayListOf<Int>()
     var simulatedChapterSize = 0
     var mCallback: Callback? = null
@@ -75,12 +70,9 @@ object ReadManga : CoroutineScope by MainScope() {
     val hasNextChapter get() = durChapterIndex < simulatedChapterSize - 1
     //重置阅读数据
     fun resetData(book: Book) {
+        // 换书前落库上一本书未入库的阅读会话
+        ReadSessionRecorder.flush()
         ReadManga.book = book
-        readRecord.bookName = book.name
-        readRecord.bookAuthor = book.author
-        readRecord.deviceId = AppConst.androidId
-        readRecord.lastRead = System.currentTimeMillis()
-        sessionStartTime = System.currentTimeMillis()
         readStartTime = System.currentTimeMillis()
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -136,54 +128,50 @@ object ReadManga : CoroutineScope by MainScope() {
         nextMangaChapter = null
     }
 
-    //每次切换章节更新阅读记录
+    /**
+     * 翻页心跳：只延长内存中的打开会话，不逐页写库。
+     * 会话在暂停/退出/换书/跨度过长时由 [ReadSessionRecorder] 统一落库。
+     */
     fun upReadTime() {
-        executor.execute {
-            if (!AppConfig.enableReadRecord || book == null) {
-                return@execute
-            }
-            val now = System.currentTimeMillis()
-            
-            readRecord.readTime = readRecord.readTime + now - readStartTime
-            readStartTime = now
-            readRecord.lastRead = now
-            readRecord.durChapterTitle = book?.durChapterTitle.orEmpty()
-
-            val session = ReadRecordSession(
-                deviceId = readRecord.deviceId,
-                bookName = readRecord.bookName,
-                bookAuthor = readRecord.bookAuthor,
-                startTime = sessionStartTime,
-                endTime = now,
-                words = 0,
-                durChapterTitle = readRecord.durChapterTitle,
-                source = ReadRecordSource.MANGA.name
-            )
-            
-            val repository = ReadRecordRepository(appDb.readRecordDao)
-            try {
-                kotlinx.coroutines.runBlocking {
-                    repository.saveReadSession(session)
-                }
-            } catch (e: Exception) {
-                kotlinx.coroutines.runBlocking {
-                    appDb.readRecordDao.insert(readRecord)
-                }
-            }
-            
-            sessionStartTime = now
+        val book = book ?: return
+        if (!AppConfig.enableReadRecord) {
+            return
         }
+        val now = System.currentTimeMillis()
+        readStartTime = now
+        ReadSessionRecorder.onReadTick(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            bookAuthor = book.author,
+            chapterTitle = book.durChapterTitle.orEmpty(),
+            source = ReadRecordSource.MANGA.name,
+            now = now
+        )
+    }
+
+    /** 阅读暂停/退出：落库当前会话 */
+    fun flushReadTime() {
+        if (!AppConfig.enableReadRecord) {
+            return
+        }
+        ReadSessionRecorder.flush()
     }
 
     fun markReadStart() {
-        if (!AppConfig.enableReadRecord || book == null) {
+        val book = book ?: return
+        if (!AppConfig.enableReadRecord) {
             return
         }
-        readRecord.source = ReadRecordSource.MANGA.name
         val now = System.currentTimeMillis()
-        sessionStartTime = now
         readStartTime = now
-        readRecord.lastRead = now
+        ReadSessionRecorder.onReadStart(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            bookAuthor = book.author,
+            chapterTitle = book.durChapterTitle.orEmpty(),
+            source = ReadRecordSource.MANGA.name,
+            now = now
+        )
     }
 
     @Synchronized

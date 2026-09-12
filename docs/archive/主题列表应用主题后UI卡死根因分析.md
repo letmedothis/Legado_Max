@@ -392,5 +392,109 @@ override fun recreate() {
 | `app/src/main/java/io/legado/app/ui/config/ConfigActivity.kt`                   | RECREATE 重建延后到 onResume（后台不立即重建，避免并发窗口重建）                                 |
 | `app/src/main/java/io/legado/app/ui/main/MainActivity.kt`                       | 同上（保留 onResume 背景刷新回退）                                                               |
 | `app/src/main/java/io/legado/app/App.kt`                                        | `onConfigurationChanged` 断开反馈环：不再重复 `setDefaultNightMode`，只刷新主题+通知重建         |
-| `app/src/main/java/io/legado/app/help/config/ThemeConfig.kt`                    | 新增 `notifyRecreate()` 防抖广播（500→1500ms）；`applyDayNight` 改用它                           |
+| `app/src/main/java/io/legado/app/help/config/ThemeConfig.kt`                    | 新增 `notifyRecreate()` 防抖广播（500→1500ms）；`applyDaylight` 改用它                           |
 | `app/src/main/java/io/legado/app/ui/config/theme/legacy/ThemeConfigFragment.kt` | `recreateActivities()` 改用 `ThemeConfig.notifyRecreate()`（消除主题链路直接广播点）             |
+
+---
+
+## 14. 第七轮（2026-09-10）：test 分支修复缺失导致回归复现 + 本次落地
+
+### 14.1 回归确认
+
+用户再次上报同一现象（应用主题后页面定格、无法点击/滑动、仅返回可响应），但**当前 `test` 分支代码里前六轮修复全部不存在**（逐一核对）：
+
+| 轮次修复内容                          | 当前 `test` 分支状态                                           |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| App.kt `onConfigurationChanged` 断开反馈环 | ❌ 仍在 `CONFIG_UI_MODE` 变化时调用 `applyDayNight()`（`App.kt:147-152`） |
+| ThemeConfig `notifyRecreate()` 防抖        | ❌ 不存在；`applyDayNight` 仍直接 `postEvent(RECREATE)`（`ThemeConfig.kt:79`） |
+| Manifest `uiMode`（ThemeManage/Config）    | ❌ 两 Activity 均未声明 `configChanges`                            |
+| AppConfig.isNightTheme 缓存同步            | ❌ setter 只写 pref，`themeMode` 缓存不同步（`AppConfig.kt:253-258`） |
+| BaseComposeActivity 重建合并守卫           | ❌ 不存在                                                       |
+| BaseActivity 背景图异步化                | ❌ `upBackgroundImage()` 仍在主线程解码+模糊（`BaseActivity.kt:205`） |
+| MainActivity/ConfigActivity 延后重建       | ❌ RECREATE 回调仍立即 `recreate()`                              |
+| legacy `ThemeConfigFragment` 防抖广播     | ❌ 仍直接 `postEvent(RECREATE)`                                  |
+
+即「第 1~6 轮」的成果没有合到当前分支（或合过又被回退），用户的构建实际运行在**修复前状态**，bug 必然复现。
+
+### 14.2 本次根因复盘（与前述章节结论一致）
+
+一次「应用主题」点击在主线程内产生多条重建通道：
+
+1. `applyDayNight` → `initNightMode` → `AppConfig.isNightTheme` 缓存未同步 → 可能判错目标模式 → 触发额外/错误的 `setDefaultNightMode` 重建级联；
+2. `setDefaultNightMode` → uiMode 配置变化 → `App.onConfigurationChanged` → 再次 `applyDayNight` → 再次 `setDefaultNightMode`…… 形成**反馈环**（实测一次点击可产生 6 连发 RECREATE 广播，见第 12 节）；
+3. `postEvent(EventBus.RECREATE)` 同步派发 → 主题页 / MainActivity / ConfigActivity 各自 `recreate()`。
+
+在部分 OEM ROM（HyperOS 等）上，同主线程多窗口并发重建破坏窗口/输入状态 → 页面定格、触摸被残留层吞噬，仅系统 BACK 可响应；main 线程未阻塞（看门狗未触发），故「返回重进即恢复正常」。
+
+「背景图不显示」为该现象的伴随项：`setLegadoContent` 的背景图只在该 Activity 创建时一次性加载，重建被竞态打断后新实例的背景加载协程未跑完即被销毁，背景自然缺失。
+
+### 14.3 本次修复（第 7 轮落地）
+
+按第 5 节 5.1~5.4、第 8.2 节、第 11.2 节、第 12/13 节方案完整补齐代码（实现清单见 `docs/archive/主题列表应用主题后UI卡死修复计划（第七轮）.md`）：
+
+- `App onConfigurationChanged` 断开反馈环（不再 `setDefaultNightMode`，只刷新主题+防抖广播）；
+- `ThemeConfig.notifyRecreate()` 尾沿防抖广播（1.5s 静默窗口合并多路触发、窗口内新操作顺延），`applyDayNight` 与 legacy 片段统一走它；
+- Manifest：ThemeManageActivity / ConfigActivity 声明 `configChanges="uiMode"`；
+- `AppConfig.isNightTheme` setter 同步 `themeMode` 缓存并退出墨水屏模式；
+- `BaseComposeActivity` 重建合并守卫；ThemeManageActivity 覆写 `onConfigurationChanged → recreate()`；
+- `BaseActivity.upBackgroundImage` 解码+模糊移出主线程；
+- MainActivity / ConfigActivity 的 RECREATE 重建延后到 `onResume`（后台不并发重建）。
+
+> 本次谓词：修的是「应用主题时重建风暴/竞态」这条主线；背景图模糊耗时优化（小图放大模糊）与 `clearBg` 异步化属于性能项，不在本次范围。
+
+## 15. 第八轮（2026-09-10）：模拟器实测「recreate 原地重建实例重组冻结」并修复
+
+### 15.1 背景：第 7 轮修复后仍复现
+
+第 7 轮落地（重建风暴合并 + 防抖 + configChanges）后，在 MuMu 模拟器（Android 15，HyperOS 风格，应用 `io.legado.app.debug` = appLegacyDebug）上 **单次 build 依然能稳定复现**：应用主题（日夜切换）后，页面仅在返回/应用按钮可点，tab 点击、列表滑动、长按多选全部无效。
+
+### 15.2 现象精准化（gfxinfo + 打点探针，一次 relaunch 只重建一次为前提）
+
+在「单次重建」（迟到 RECEIVE 已被 2000ms 宽限拦截）的前提下，冻结依然发生：
+
+```
+冷启动（对照组）  : onTabChange → 9ms 后 recomposed → animateScrollToPage 完成 → 27~33 帧
+relaunch/recreate: onTabChange → （无 recomposed）→（无 pageanim）→ 0~2 帧
+```
+
+- **输入通**：tab 点击的 onClick 正常执行（`state.switchTab` 被调用，from=NIGHT 读到值）；
+- **状态写通**：`switchTab` 修改 `tab`（mutableStateOf）后无后续；
+- **重组断**：Screen 顶层 `SideEffect` 日志不再打印；`LaunchedEffect(state.tab)` 不重启（连动画入口日志都不出现）；
+- **强致**：`Snapshot.sendApplyNotifications()` + `view.invalidate()` 显式唤醒均无效（排除了「观察者没收到通知」）；
+- **帧**：`dumpsys gfxinfo` 显示 0~2 帧 —— 连 LazyColumn 滚动（pointer 驱动）都不产生帧；
+- 主线程 ANR 栈：`Looper.loop → MessageQueue.next → epoll_pwait` —— 无死锁、空闲正常；
+- SurfaceFlinger：窗口 `shown=true / HAS_DRAWN / isOnScreen=true`，无 `ScreenRotationAnimation`，无残活动画（`mEnterAnimationPending=false`）；
+- **对照组（决定性）**：同一进程（warm，pid 不变）、同一 Activity、同一探针 —— 全新 `startActivity` 启动的实例：重组 5ms 内触发、动画 200ms 完成、帧数 28 —— **完全健康**。
+
+### 15.3 结论
+
+- 冻结与「窗口过渡动画」「输入层」「主线程」「双重建竞态」**均无关**（动画 scale=0 照旧复现）；
+- 根因是 **ActivityTaskManager 的原地 recreate（系统 relaunch）重建出的窗口层级的 Compose 实例，其重组/重绘调度整体停摆**：首帧组合成功、随后所有 snapshot 变更都不再驱动 Recomposer（`sendApplyNotifications` 无效说明失效层级在 recomposer 与 frame clock 之间，而非观察者通道）；
+- 同一进程内「全新启动」的实例完全健康 —— **绕过原地重建即可根治**。
+
+### 15.4 修复（第 8 轮落地）
+
+`ThemeManageActivity`：
+
+1. 用 `override fun recreate()` 接管全部重建入口（原 BaseComposeActivity 的 guard 保留不调用）：
+   - 不再走系统原地重建，改为 `startActivity(Intent(this, ThemeManageActivity))` + `finish()`（NO_ANIMATION），
+     让新窗口以「全新启动」路径建立（已被实测为健康路径）；
+2. 保留第 7 轮既有守卫：
+   - `onCreate` 记录实例创建时刻 + 2s 宽限，拦截 AppCompat 强制 relaunch 后防抖窗口内迟到的 RECEIVE 广播；
+   - `recreatePending` 防重入（RECEIVE 的 `postOnAnimation` 与 override 内部共用，未预先置位以防自锁）。
+3. 还原所有诊断探针（日志、SideEffect、pager 动画打点、sendApplyNotifications/invalidate 实验代码已全部移除）。
+
+### 15.5 验证（模拟器实测，干净包）
+
+| 场景 | 结果 |
+|---|---|
+| 应用主题（DAY→NIGHT 真实切换，AppCompat 强制 relaunch） | 唯一一次重建走 recreate→restart；迟到 RECEIVE diff≈1477ms 被拦截 |
+| 重启后点 tab（NIGHT→DAY） | `recomposed` 触发、`pageanim done`、页面切换、帧数正常 |
+| 长按主题卡 → 多选模式 | UI 底部出现「取消/全选」等多选栏（旧冻结态不出现） |
+| 同主题再次应用（RECEIVE→recreate 路径） | 同样走 restart，交互正常 |
+| cold start 回归 | 正常（探针后再次冒烟 10 帧、列表切换正确） |
+
+### 15.6 遗留事项
+
+- 现象与设备/ROM 的相关性：MuMu/模拟器与真机 HyperOS 在「recreate 原地重建」上的表现应一致（原始用户报告即真机），修复走「全新启动」路径规避，不依赖 ROM 行为；
+- 「recreate 后 Recomposer 不调度」的底层（Compose runtime x ActivityTaskManager relaunch）未在本次继续深挖 —— 已用替换路径绕开，属框架层行为。
