@@ -1,0 +1,130 @@
+name: Check Upstream Updates
+
+on:
+  schedule:
+    # 每天北京时间 09:20 检查；只提示，不自动合并。
+    - cron: "20 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: check-upstream-updates
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: ${{ github.repository == 'letmedothis/Legado_Max' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout my-changes
+        uses: actions/checkout@v5
+        with:
+          ref: my-changes
+          fetch-depth: 0
+
+      - name: Compare upstream/main with my-changes
+        id: compare
+        shell: bash
+        run: |
+          git remote add upstream https://github.com/Suml-1/Legado_Max.git
+          git fetch --no-tags upstream main
+
+          upstream_sha=$(git rev-parse upstream/main)
+          current_sha=$(git rev-parse HEAD)
+          behind_count=$(git rev-list --count HEAD..upstream/main)
+          ahead_count=$(git rev-list --count upstream/main..HEAD)
+
+          {
+            echo "upstream_sha=$upstream_sha"
+            echo "current_sha=$current_sha"
+            echo "behind_count=$behind_count"
+            echo "ahead_count=$ahead_count"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Upstream update check"
+            echo
+            echo "- checked branch: \`my-changes\`"
+            echo "- upstream: \`Suml-1/Legado_Max@main\`"
+            echo "- upstream-only commits: **$behind_count**"
+            echo "- my-changes-only commits: **$ahead_count**"
+            echo "- upstream SHA: \`$upstream_sha\`"
+            echo "- my-changes SHA: \`$current_sha\`"
+            echo
+            echo "This workflow only reports updates and never merges or pushes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create or update reminder issue
+        uses: actions/github-script@v8
+        env:
+          BEHIND_COUNT: ${{ steps.compare.outputs.behind_count }}
+          AHEAD_COUNT: ${{ steps.compare.outputs.ahead_count }}
+          UPSTREAM_SHA: ${{ steps.compare.outputs.upstream_sha }}
+          CURRENT_SHA: ${{ steps.compare.outputs.current_sha }}
+        with:
+          script: |
+            const title = '[上游同步] upstream/main 有待同步更新';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const behind = Number(process.env.BEHIND_COUNT);
+            const marker = '<!-- codex-upstream-check -->';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = issues.find(issue =>
+              !issue.pull_request &&
+              (issue.title === title || issue.body?.includes(marker))
+            );
+
+            if (behind === 0) {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  body: `${marker}\n检测到 \`my-changes\` 已包含当前 \`upstream/main\`，自动关闭此提示。`,
+                });
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  state: 'closed',
+                });
+              }
+              core.notice('my-changes already contains upstream/main.');
+              return;
+            }
+
+            const body = `${marker}
+            定时检查发现 \`upstream/main\` 有 **${behind}** 个提交尚未包含在 \`my-changes\` 中。
+
+            - upstream SHA: \`${process.env.UPSTREAM_SHA}\`
+            - my-changes SHA: \`${process.env.CURRENT_SHA}\`
+            - my-changes 独有提交: **${process.env.AHEAD_COUNT}**
+            - 检测时间: ${new Date().toISOString()}
+
+            请人工确认后，按 \`.codex/sync-upstream.md\` 或 \`scripts/sync-upstream.sh\` 执行同步。本工作流不会自动 merge 或 push。`;
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+              core.notice(`Updated issue #${existing.number}.`);
+            } else {
+              const { data: issue } = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+              });
+              core.notice(`Created issue #${issue.number}.`);
+            }

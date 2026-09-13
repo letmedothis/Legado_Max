@@ -6,16 +6,17 @@
 
 ## 当前 workflows
 
-| 文件                   | 名称                   | 触发                                                   | 作用                                                                                       |
-| ---------------------- | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `test.yml`             | Test Build             | push / pull_request / workflow_run / workflow_dispatch | 构建全部 3 个 release flavor；自动创建 GitHub/Gitee 发布并从 `updateLog.md` 生成 changelog |
-| `web.yml`              | Build Web              | push / pull_request / workflow_dispatch                | `modules/web/` 有过改动时构建 Vue 前端，并把产物提交到 `app/src/main/assets/web/vue/`      |
-| `cronet.yml`           | Update Cronet          | schedule / workflow_dispatch                           | 更新 Cronet 原生库                                                                         |
-| `lint.yaml`            | Quick Lint and Compile | push / pull_request                                    | commit 规范(commitlint) + 编译 + spotless 格式检查(可选) + Android lint + 帮助文档映射校验 |
-| `unit-test.yaml`       | Unit Test              | push / pull_request                                    | 单元测试                                                                                   |
-| `build-onlyDebug.yaml` | Build Debug APK        | push / pull_request                                    | 构建 Debug APK                                                                             |
-| `release.yml`          | Release Build 双包打包 | workflow_dispatch                                      | 手动触发，打双包发布                                                                       |
-| `stale.yml`            | closeStaleIssue        | schedule / workflow_dispatch                           | 清理 stale issue                                                                           |
+| 文件                   | 名称                   | 触发                                                   | 作用                                                                                               |
+| ---------------------- | ---------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `test.yml`             | Test Build             | push / pull_request / workflow_run / workflow_dispatch | 构建全部 3 个 release flavor；自动创建 GitHub/Gitee 发布并从 `updateLog.md` 生成 changelog         |
+| `web.yml`              | Build Web              | push / pull_request / workflow_dispatch                | `modules/web/` 有过改动时构建 Vue 前端，并把产物提交到 `app/src/main/assets/web/vue/`              |
+| `cronet.yml`           | Update Cronet          | schedule / workflow_dispatch                           | 更新 Cronet 原生库                                                                                 |
+| `lint.yaml`            | Quick Lint and Compile | push / pull_request                                    | commit 规范(commitlint) + 编译 + spotless 格式检查(可选) + Android lint + 帮助文档映射校验         |
+| `unit-test.yaml`       | Unit Test              | push / pull_request                                    | 单元测试                                                                                           |
+| `build-onlyDebug.yaml` | Build Debug APK        | push / pull_request                                    | 构建 Debug APK                                                                                     |
+| `release.yml`          | Release Build 双包打包 | workflow_dispatch                                      | 手动触发，打双包发布                                                                               |
+| `upstream-check.yml`   | Check Upstream Updates | schedule / workflow_dispatch                           | 只检测 `upstream/main` 是否领先 `my-changes`，维护提示 Issue 与 workflow summary，不自动合并或推送 |
+| `stale.yml`            | closeStaleIssue        | schedule / workflow_dispatch                           | 清理 stale issue                                                                                   |
 
 ## 检查项与工具链清单
 
@@ -39,5 +40,6 @@ CI 里用到的检查工具分散在各 workflow 中，这里集中登记，方�
 ## 2. 使用注意
 
 - workflow 文件以推送分支为准，本地改动后推到对应分支才会触发。
+- GitHub Actions 的 `schedule` 只读取默认分支上的 workflow。本仓库默认分支为 `main`；`upstream-check.yml` 仅存在于 `my-changes` 时只能手动选择该分支运行，定时检查需先由维护者将 workflow 文件纳入默认分支或调整仓库默认分支。
 - 涉及签名密钥的关键文件在 workflows 目录内，发布相关改动要核对 `release.yml` 与密钥引用。
 - 新加 workflow 后在本表登记，保持索引与实际文件一致（与 project-rules 维护约定一致）。
