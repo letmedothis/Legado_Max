@@ -479,6 +479,9 @@ class AudioPlayService : BaseService(),
                 val durP = exoPlayer.currentPosition
                 //更新buffer位置
                 AudioPlay.playPositionChanged(durP.toInt())
+                if (exoPlayer.isPlaying) {
+                    AudioPlay.upReadTime()
+                }
                 val bufferedPosition = exoPlayer.bufferedPosition.toInt()
                 if (bufferedPosition != lastBufferedPosition) {
                     lastBufferedPosition = bufferedPosition

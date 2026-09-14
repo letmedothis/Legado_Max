@@ -364,6 +364,10 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord) {
             return
         }
+        // 朗读服务负责把播放时长记录为 AUDIO，避免页面同步再次写成 TEXT 并打断听书会话。
+        if (BaseReadAloudService.isPlay() && BaseReadAloudService.isActiveBook(book.bookUrl)) {
+            return
+        }
         val now = System.currentTimeMillis()
         readStartTime = now
         val currentChapter = book.durChapterIndex

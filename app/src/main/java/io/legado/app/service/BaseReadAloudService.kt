@@ -38,6 +38,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.readRecord.ReadRecordSource
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
@@ -53,6 +54,8 @@ import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.BookCover
+import io.legado.app.model.PlaybackReadSession
+import io.legado.app.model.PlaybackReadSessionTracker
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.receiver.MediaButtonReceiver
@@ -512,6 +515,20 @@ abstract class BaseReadAloudService : BaseService(),
     private var lastDispatchTtsProgressTime = 0L
     private var lastDispatchTtsProgress = -1
     private var lastDispatchTtsChapterIndex = -1
+    private val readSessionTracker = PlaybackReadSessionTracker(
+        source = ReadRecordSource.AUDIO.name,
+        isEnabled = { AppConfig.enableReadRecord },
+        sessionProvider = {
+            sessionBook?.let {
+                PlaybackReadSession(
+                    deviceId = AppConst.androidId,
+                    bookName = it.name,
+                    bookAuthor = it.author,
+                    chapterTitle = activeChapterTitle ?: it.durChapterTitle.orEmpty(),
+                )
+            }
+        },
+    )
     private var cover: Bitmap =
         BitmapFactory.decodeResource(appCtx.resources, R.drawable.icon_read_book)
     var pageChanged = false
@@ -563,6 +580,7 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     override fun onDestroy() {
+        readSessionTracker.flush()
         super.onDestroy()
         preloadNextTextChapterJob?.cancel()
         if (useWakeLock) {
@@ -625,6 +643,7 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun stopReadAloud() {
+        readSessionTracker.flush()
         pause = true
         needResumeOnAudioFocusGain = false
         needResumeOnCallStateIdle = false
@@ -657,6 +676,7 @@ abstract class BaseReadAloudService : BaseService(),
         }
         isRun = true
         pause = false
+        readSessionTracker.start()
         needResumeOnAudioFocusGain = false
         needResumeOnCallStateIdle = false
         upReadAloudNotification()
@@ -668,6 +688,7 @@ abstract class BaseReadAloudService : BaseService(),
 
     @CallSuper
     open fun pauseReadAloud(abandonFocus: Boolean = true) {
+        readSessionTracker.flush()
         if (useWakeLock) {
             wakeLock.release()
             wifiLock?.release()
@@ -687,6 +708,7 @@ abstract class BaseReadAloudService : BaseService(),
     @CallSuper
     open fun resumeReadAloud() {
         resumeReadAloudInternal()
+        readSessionTracker.start()
     }
 
     private fun resumeReadAloudInternal() {
@@ -701,6 +723,9 @@ abstract class BaseReadAloudService : BaseService(),
     abstract fun upSpeechRate(reset: Boolean = false)
 
     fun upTtsProgress(progress: Int) {
+        if (isRun && !pause) {
+            readSessionTracker.tick()
+        }
         updateSessionProgress(progress)
     }
 

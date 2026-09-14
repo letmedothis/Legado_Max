@@ -78,6 +78,20 @@ object AudioPlay : CoroutineScope by MainScope() {
     var bookSource: BookSource? = null
     val loadingChapters = arrayListOf<Int>()
     private var lastProgressSaveTime = 0L
+    private val readSessionTracker = PlaybackReadSessionTracker(
+        source = ReadRecordSource.AUDIO.name,
+        isEnabled = { AppConfig.enableReadRecord },
+        sessionProvider = {
+            book?.let {
+                PlaybackReadSession(
+                    deviceId = AppConst.androidId,
+                    bookName = it.name,
+                    bookAuthor = it.author,
+                    chapterTitle = it.durChapterTitle.orEmpty(),
+                )
+            }
+        },
+    )
     val executor = globalExecutor
 
     /**
@@ -148,32 +162,16 @@ object AudioPlay : CoroutineScope by MainScope() {
      * 阅读暂停/停止：以当前章节名收口并落库当前会话
      */
     fun flushReadTime() {
-        if (!AppConfig.enableReadRecord) {
-            return
-        }
-        val book = book ?: return
-        ReadSessionRecorder.onReadTick(
-            deviceId = AppConst.androidId,
-            bookName = book.name,
-            bookAuthor = book.author,
-            chapterTitle = book.durChapterTitle.orEmpty(),
-            source = ReadRecordSource.AUDIO.name,
-        )
-        ReadSessionRecorder.flush()
+        readSessionTracker.flush()
     }
 
     fun markReadStart() {
-        if (!AppConfig.enableReadRecord) {
-            return
-        }
-        val book = book ?: return
-        ReadSessionRecorder.onReadStart(
-            deviceId = AppConst.androidId,
-            bookName = book.name,
-            bookAuthor = book.author,
-            chapterTitle = book.durChapterTitle.orEmpty(),
-            source = ReadRecordSource.AUDIO.name,
-        )
+        readSessionTracker.start()
+    }
+
+    /** 播放心跳：推进听书会话，并触发长会话的定期落库。 */
+    fun upReadTime() {
+        readSessionTracker.tick()
     }
 
     /**
