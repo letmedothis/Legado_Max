@@ -1064,7 +1064,7 @@
     <string name="export_to_clipboard">导出JSON到剪贴板</string>
     <string name="import_bookshelf">导入书单</string>
     <string name="pre_download">向后预下载</string>
-    <string name="pre_download_m">向后预下载%s页</string>
+    <string name="pre_download_m">向后预下载%d页</string>
     <string name="pre_download_s">向后预先下载 %s 章正文</string>
     <string name="backward_pre_download">向前预下载</string>
     <string name="backward_pre_download_s">向前预下载 %s 章</string>

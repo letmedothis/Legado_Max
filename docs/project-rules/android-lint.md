@@ -29,12 +29,12 @@ CI 里默认「有 Error 就构建失败」（`abortOnError`），Warning 和 Hi
 
 「Lint」是静态检查工具的通用叫法。本项目同时存在多个 lint 系工具，职责完全不同：
 
-| 工具              | 检查对象               | 检查内容                                             | CI 位置                                          |
-| ----------------- | ---------------------- | ---------------------------------------------------- | ------------------------------------------------ |
-| commitlint        | 提交信息               | 是否符合 Conventional Commits 中文规范               | lint.yaml「Check Commit Messages」               |
-| spotless + ktlint | `.kt` 文件文本         | Kotlin 代码风格（尾随逗号、导入、换行）              | lint.yaml「Kotlin Format Check」（可选，不阻塞） |
-| Android Lint      | 代码 + 资源 + manifest | 平台语义（兼容性 / 废弃 API / 资源 / 无障碍 / 性能） | lint.yaml「Android Lint」（硬性必过）            |
-| prettier          | `.js / .ts / .md`      | 前端与文档格式                                       | 仅本地 pre-commit                                |
+| 工具              | 检查对象                               | 检查内容                                             | CI 位置                                          |
+| ----------------- | -------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| commitlint        | 提交信息                               | 是否符合 Conventional Commits 中文规范               | lint.yaml「Check Commit Messages」               |
+| spotless + ktlint | `.kt` 文件文本                         | Kotlin 代码风格（尾随逗号、导入、换行）              | lint.yaml「Kotlin Format Check」（可选，不阻塞） |
+| Android Lint      | 代码 + 资源 + manifest                 | 平台语义（兼容性 / 废弃 API / 资源 / 无障碍 / 性能） | lint.yaml「Android Lint」（硬性必过）            |
+| prettier          | `.js / .ts / .jsx / .tsx / .vue / .md` | 前端与文档格式（package.json `lint-staged` 实配）    | 仅本地 pre-commit                                |
 
 一句话：普通 lint 查**风格**，Android Lint 查**会不会出事**。ktlint 不会告诉你 `onBackPressed` 在新系统失效，Android Lint 会。
 

@@ -1,5 +1,6 @@
 package io.legado.app.ui.image
 
+import androidx.annotation.RequiresApi
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
@@ -168,6 +169,7 @@ class ImageCropActivity : BaseActivity<ActivityImageCropBinding>(
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun decodeBitmapWithImageDecoder(
         file: File,
         targetDecodeWidth: Int,

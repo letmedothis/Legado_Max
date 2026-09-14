@@ -14,6 +14,8 @@
         <span v-else>正在备份...</span>
       </button>
 
+      <p v-if="isBackingUp" class="backup-hint">书籍缓存较多时可能需要几分钟，请耐心等待…</p>
+
       <transition name="fade">
         <div v-if="backupOverview" class="result-section">
           <div class="result-header">
@@ -212,7 +214,15 @@ const handleBackup = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(`备份失败: ${response.statusText}`)
+      // 500 响应体是 ReturnData JSON，优先展示其中的真实失败原因
+      let msg = `备份失败: ${response.statusText}`
+      try {
+        const data = await response.json()
+        if (data?.errorMsg) msg = data.errorMsg
+      } catch {
+        // 响应体非 JSON 时保留 statusText 提示
+      }
+      throw new Error(msg)
     }
 
     const blob = await response.blob()
@@ -316,6 +326,16 @@ const handleBackup = async () => {
 
   &.loading {
     background: #999;
+  }
+}
+
+.backup-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #999;
+
+  .dark & {
+    color: #666;
   }
 }
 

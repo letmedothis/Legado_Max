@@ -1,10 +1,6 @@
 # Compose UI 规范 — 测试
 
-> **生效范围**：`io.legado.app.ui` 包及以下所有代码
-> **本文件为原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物**：含原章节 §16，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。
-> 同目录全套：`structure.md`（§1/2/3/11/12）、`state-events.md`（§4/5/6）、`theme-styles.md`（§7）、`performance.md`（§8）、`navigation-preview.md`（§9/10）、`accessibility.md`（§15）、`migration-review.md`（§13/14/17）。
-> **执行方式**：§14（见 `migration-review.md`）中标 [机器] 的项由 lint/Detekt/CI 规则强制，违规直接构建失败；[人工] 项 Code Review 时人工对照，不达标 PR 打回
-> **老代码策略**：分阶段迁移，允许 `@Suppress("LegadoUiViolation")` + TODO 临时过渡（见 `migration-review.md` §13）
+> 原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物：§16，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。生效范围、执行方式、老代码策略等通用约定见 [README.md](./README.md)。
 > **最后更新**：2026-09-10
 
 ---

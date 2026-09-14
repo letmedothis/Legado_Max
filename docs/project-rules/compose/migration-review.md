@@ -1,8 +1,6 @@
 # Compose UI 规范 — 迁移、Review Checklist 与典型违规示例
 
-> **生效范围**：`io.legado.app.ui` 包及以下所有代码
-> **本文件为原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物**：含原章节 §13、§14、§17，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。
-> 同目录全套：`structure.md`（§1/2/3/11/12）、`state-events.md`（§4/5/6）、`theme-styles.md`（§7）、`performance.md`（§8）、`navigation-preview.md`（§9/10）、`accessibility.md`（§15）、`testing.md`（§16）。
+> 原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物：§13、§14、§17，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。生效范围、执行方式、老代码策略等通用约定见 [README.md](./README.md)。
 > **最后更新**：2026-09-03
 
 ---
@@ -20,7 +18,7 @@ private fun ThemeAddBottomBar(...) { ... }
 // TODO(#issue号): 迁移到 ui/config/widget/ConfigAddBottomBar.kt，统一 Dim. 和 Color
 ```
 
-**要求**：`LegadoUiViolation` Suppress 必须伴随具体 TODO，否则 PR 打回。
+**要求**：`LegadoUiViolation` Suppress 必须伴随具体 TODO，否则 PR 打回。（注：该注解没有对应的 lint 规则，现阶段仅作为人工 Review 的标记使用，见 §14.1 说明。）
 
 ### 阶段二：清理（次 Sprint）
 
@@ -36,7 +34,7 @@ private fun ThemeAddBottomBar(...) { ... }
 
 ## 14. Code Review Checklist
 
-分两层：**机器项先行（CI 硬卡），人工项次之（Review）**。机器规则已把违规拦在构建阶段的，Reviewer 不重复检查。
+分两层设计：**机器项（CI 硬卡）、人工项（Review）**。注意：机器项的强制机制**尚未建立**（见 §14.1 目标态声明），现阶段表中所有条目一律按 §14.2 人工对照执行。
 
 ### 14.1 [机器] CI 硬卡（违规 = 构建红，不依赖 Reviewer 心情）
 
@@ -57,7 +55,7 @@ private fun ThemeAddBottomBar(...) { ... }
 | 阶段三起新增 `@Suppress("LegadoUiViolation")`                                                                       | CI grep，直接挂                                                                          |
 | 新增 `*ViewModel.kt` 但无对应 `*ViewModelTest.kt`（`testing.md` §16.4）                                             | CI 脚本对比 src/test 路径                                                                |
 
-> 机器规则统一维护在 `tools/lint-rules/` 独立模块并纳入 CI。**修改本表的 PR 必须同步更新规则代码**，只改文档不改规则的一律视为"未落地"，打回。
+> **目标态声明**：上表「实现方式」列描述的是目标态——机器规则统一维护在 `tools/lint-rules/` 独立模块并纳入 CI。该模块**当前尚未建立**（Detekt、compose-lint-checks 也未接入），表中规则现阶段一律按人工 Review 对照执行，不构成 CI 硬卡。规则模块落地后本表才成为构建期强制依据，届时「修改本表的 PR 必须同步更新规则代码」。
 
 ### 14.2 [人工] Reviewer 对照（任一 ❌ 打回）
 

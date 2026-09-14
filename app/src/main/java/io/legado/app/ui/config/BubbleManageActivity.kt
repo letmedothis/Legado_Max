@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.widget.SwitchCompat
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.use
@@ -115,6 +116,8 @@ class BubbleManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPi
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // Android 13+ 预测性返回不再回调 onBackPressed，统一走 Dispatcher
+        onBackPressedDispatcher.addCallback(this, backCallback)
         initView()
         loadPackages()
     }
@@ -174,11 +177,18 @@ class BubbleManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPi
         }
     }
 
-    override fun onBackPressed() {
-        if (isMultiSelectMode) {
-            exitMultiSelectMode()
-        } else {
-            super.onBackPressed()
+    /**
+     * 多选模式下返回键退出多选，其余情况转发给 BaseActivity 已注册的 finish 回调
+     */
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (isMultiSelectMode) {
+                exitMultiSelectMode()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
         }
     }
 

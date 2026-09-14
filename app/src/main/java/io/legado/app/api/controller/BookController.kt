@@ -10,6 +10,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.NoBooksDirException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.CacheManager
 import io.legado.app.help.book.BookHelp
@@ -28,6 +29,7 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.stackTraceStr
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import splitties.init.appCtx
@@ -295,11 +297,15 @@ object BookController {
             val uri = LocalBook.saveBookFile(File(fileData).inputStream(), fileName)
             LocalBook.importFile(uri)
         }.onFailure {
+            //web传书在浏览器上操作，app内原本毫无感知，成败都在本机弹Toast提示
+            appCtx.toastOnUi("Web传书失败：${it.localizedMessage ?: "未知错误"}")
             return when (it) {
+                is NoBooksDirException -> returnData.setErrorMsg("未设置书籍保存位置，请在App设置中设置")
                 is SecurityException -> returnData.setErrorMsg("需重新设置书籍保存位置!")
                 else -> returnData.setErrorMsg("保存书籍错误\n${it.localizedMessage}")
             }
-        }.onSuccess {
+        }.onSuccess { book ->
+            appCtx.toastOnUi("《${book.name}》添加书架成功")
             postEvent(EventBus.BOOKSHELF_REFRESH, "")//BOOKSHELF_REFRESH` 会让书架Fragment执行 `refreshBookshelf()`，从数据库重新拉取完整列表，从web服务导入的书自然就出来了。
             postEvent(EventBus.UP_BOOKSHELF, "")
         }

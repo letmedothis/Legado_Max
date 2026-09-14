@@ -25,13 +25,14 @@
 | [build-commands.md](./build-commands.md)     | 构建命令全表、Web 前端命令、3 个 flavor、SDK/JDK/版本目录                                            | 构建报错、首次构建、不认识 flavor / 命令、动 `libs.versions.toml` 或 `modules/web/` 时 |
 | [ci-cd.md](./ci-cd.md)                       | `.github/workflows/` 各 workflow 职责与触发条件                                                      | CI 报错、调整 workflow、确认发版 / 构建流程时                                          |
 | [android-lint.md](./android-lint.md)         | Android Lint 工具说明：与普通 lint 的区别、查什么、基线机制、本地看报告                              | 看不懂 lint 报错、想用 lint 检查新代码时                                               |
-| [testing.md](./testing.md)                   | 单元/集成测试位置与命令、覆盖率约定、Mockk / coroutines-test / LeakCanary、测试文件提交约定          | 写测试前、跑测试、决定提交测试文件时                                                   |
+| [testing.md](./testing.md)                   | 单元/集成测试位置与命令、覆盖率口径、Mockk / coroutines-test / LeakCanary、测试文件提交约定          | 写测试前、跑测试、决定提交测试文件时                                                   |
 | [update-log-rules.md](./update-log-rules.md) | 对外更新日志 `app/src/main/assets/web/help/md/updateLog.md` 的更新时机、收录范围、格式与用户措辞约定 | 提交 app 用户可见改动后、发版前维护 `updateLog.md`，或 Review 日志条目时               |
 
 ### Compose UI 层（`compose/` 子目录）
 
 | 文件                                                             | 管什么                                                                                       | 核心红线                                                     |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [compose/README.md](./compose/README.md)                         | 总纲：生效范围、机器/人工执行方式、老代码策略、8 文件索引                                    | 机器强制机制（tools/lint-rules）尚未建立，现阶段人工对照     |
 | [compose/structure.md](./compose/structure.md)                   | Compose 目录结构、命名、API 契约、组件拆分标准                                               | Screen / StateHolder / 子组件职责边界                        |
 | [compose/state-events.md](./compose/state-events.md)             | `StateFlow<UiState>`、`Channel<Event>` 缓冲区语义、Dialog 条件渲染、`repeatOnLifecycle` 绑定 | 一次性事件缓冲区必须显式指定；ViewModel 禁止直接操作平台 API |
 | [compose/theme-styles.md](./compose/theme-styles.md)             | 颜色、dimens、图片加载（Glide 链路）、字体、字符串、动画三档时长、主题切换与页面重建         | 禁止魔法数字；主题切换禁止裸 `recreate()` 原地重建           |

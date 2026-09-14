@@ -30,7 +30,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
         "/getBookshelf", "/getChapterList", "/refreshToc", "/getBookContent",
         "/cover", "/image", "/getReadConfig",
         "/getRssSource", "/getRssSources",
-        "/getReplaceRules", "/backupPreview", "/backup",
+        "/getReplaceRules", "/backupPreview", "/backup", "/backup/",
         "/saveBookSource", "/saveBookSources", "/deleteBookSources",
         "/saveBook", "/deleteBook", "/saveBookProgress", "/addLocalBook", "/saveReadConfig",
         "/saveRssSource", "/saveRssSources", "/deleteRssSources",
@@ -60,8 +60,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
     override fun serve(session: IHTTPSession): Response {
         WebService.serve()
         var returnData: ReturnData? = null
+        //必须保留完整头（含boundary）：用contentType重写会剥掉boundary，multipart解析必然失败
         val ct = ContentType(session.headers["content-type"]).tryUTF8()
-        session.headers["content-type"] = ct.contentType
+        session.headers["content-type"] = ct.contentTypeHeader
         var uri = session.uri
 
         val startAt = System.currentTimeMillis()
@@ -135,7 +136,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                     val parameters = session.parameters
 
                     when (uri) {
-                        "/backup" -> {
+                        //书架页按钮会以 /backup/ 带尾斜杠访问，两种写法都要命中备份接口
+                        "/backup", "/backup/" -> {
                             val response = BackupController.backup()
                             response.addHeader("Access-Control-Allow-Origin", session.headers["origin"])
                             LogUtils.d(TAG) {

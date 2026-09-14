@@ -1,12 +1,14 @@
 # 高亮规则文件分布与架构
 
+> 适用范围：阅读内容「高亮规则」功能。**有效**（路径已随 2026-09 的 `highlight/` 子包迁移更新）。
+
 本文档梳理的是阅读内容里的“高亮规则”功能。代码编辑器的 TextMate 语法高亮是另一套体系，见文末“与代码编辑器高亮的区别”。
 
 ## 核心文件
 
 ### 规则模型与存储
 
-- `app/src/main/java/io/legado/app/ui/book/read/config/HighlightRule.kt`
+- `app/src/main/java/io/legado/app/ui/book/read/config/highlight/HighlightRule.kt`
   - 高亮规则数据模型。
   - 字段包括：`pattern` 正则、`enabled`、`group`、`targetScope`、文字色、下划线样式、背景色/背景图、书籍作用范围 `scope`、排除范围 `excludeScope`。
   - `matchesScope(bookName, bookOrigin)` 用于判断规则是否适用于当前书籍。

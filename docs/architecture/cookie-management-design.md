@@ -1,5 +1,7 @@
 # Cookie 管理设计文档
 
+> 适用范围：Cookie 管理在 OkHttp / Cronet / WebView / Rhino / NanoHTTPD 五个子系统间的设计。**有效**。
+
 ## 一、现状概述
 
 当前 Cookie 管理横跨 5 个子系统：OkHttp、Cronet、WebView、Rhino JS、NanoHTTPD。核心存储走 Room DB（`CookieStore`），会话 Cookie 走内存（`CacheManager`）。通过一个自定义哨兵 Header `"CookieJar"` 实现按请求粒度的 Cookie 处理开关。

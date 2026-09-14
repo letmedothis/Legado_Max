@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.webkit.MimeTypeMap
 import androidx.activity.viewModels
@@ -77,7 +78,12 @@ class DownloadManageActivity : AppCompatActivity() {
         }
     }
 
-    private fun openFolder() {
+private fun openFolder() {
+        // MediaStore.Downloads 从 API 29 才有；低版本直接走下载管理器降级
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            openDownloadsManager()
+            return
+        }
         kotlin.runCatching {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(
@@ -88,13 +94,17 @@ class DownloadManageActivity : AppCompatActivity() {
             }
             startActivity(intent)
         }.onFailure {
-            // 降级：打开系统下载管理器
-            kotlin.runCatching {
-                val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-                startActivity(intent)
-            }.onFailure {
-                toastOnUi(R.string.download_open_folder_failed)
-            }
+            openDownloadsManager()
+        }
+    }
+
+    private fun openDownloadsManager() {
+        // 降级：打开系统下载管理器
+        kotlin.runCatching {
+            val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+            startActivity(intent)
+        }.onFailure {
+            toastOnUi(R.string.download_open_folder_failed)
         }
     }
 

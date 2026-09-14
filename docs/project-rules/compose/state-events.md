@@ -1,10 +1,6 @@
 # Compose UI 规范 — 状态管理、事件与错误处理
 
-> **生效范围**：`io.legado.app.ui` 包及以下所有代码
-> **本文件为原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物**：含原章节 §4、§5、§6，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。
-> 同目录全套：`structure.md`（§1/2/3/11/12）、`theme-styles.md`（§7）、`performance.md`（§8）、`navigation-preview.md`（§9/10）、`accessibility.md`（§15）、`testing.md`（§16）、`migration-review.md`（§13/14/17）。
-> **执行方式**：§14（见 `migration-review.md`）中标 [机器] 的项由 lint/Detekt/CI 规则强制，违规直接构建失败；[人工] 项 Code Review 时人工对照，不达标 PR 打回
-> **老代码策略**：分阶段迁移，允许 `@Suppress("LegadoUiViolation")` + TODO 临时过渡（见 `migration-review.md` §13）
+> 原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物：§4、§5、§6，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。生效范围、执行方式、老代码策略等通用约定见 [README.md](./README.md)。
 > **最后更新**：2026-08-19
 
 ---
@@ -38,7 +34,7 @@ val uiState: StateFlow<ThemeManageUiState> = themeRepository.observeThemes()
 
 - 流内异常在 Repository 或 ViewModel 的 `catch` 中转为 `UiError` 状态，**禁止** `throw` 穿透到 `viewModelScope` 导致进程崩溃。
 - 一次性变更操作（增删改）仍用 `suspend fun`，ViewModel 内 `viewModelScope.launch` 调用，异常在 `try-catch` 中处理并更新 `UiState` + 抛 `Event`。
-  **为什么 Compose 侧用裸 `viewModelScope.launch` 而不违反 `coroutine-rules.md` 规则 1**：Compose ViewModel 不继承 `BaseViewModel`，`execute` 不可用；且 `execute` 的回调链（`onSuccess`/`onError`）对快速完成的任务存在不触发的时序坑（`Coroutine.kt` 源码注释），变更操作必须同步保证"更新 UiState + 抛 Event"，用 try-catch 内联处理才是确定性写法。`coroutine-rules.md` 规则 1 的适用范围是 View 系屏幕（ViewBinding + `BaseViewModel` 宿主），两者边界已在该文档中写明。
+  **为什么 Compose 侧用裸 `viewModelScope.launch` 而不违反 `coroutine-rules.md` 规则 1**：Compose ViewModel 不继承 `BaseViewModel`，`execute` 不可用；变更操作必须同步保证"更新 UiState + 抛 Event"，try-catch 内联是确定性写法（`execute` 回调链对快速完成任务的时序坑详见 `coroutine-rules.md` 规则 5）。`coroutine-rules.md` 规则 1 的适用范围是 View 系屏幕（ViewBinding + `BaseViewModel` 宿主），两者边界已在该文档中写明。
 
 ### 4.2 Screen 层
 
@@ -138,11 +134,13 @@ fun ThemeManageScreen(
 ### 5.2 降级条件
 
 当以下任一情况成立时，允许不使用 Hilt：
+
 - 模块尚未接入 Hilt 插件（如独立编译的子模块）
 - 构建环境 KSP/KAPT 冲突无法解决
 - 老代码迁移过渡期，尚未完成 DI 改造
 
 降级时**必须**：
+
 - 文件头加注释：`// DI 降级原因：xxx，迁回 Hilt deadline：YYYY-MM-DD（#issue号）`——必须带**具体回填期限**，"后续"、"下个迭代"这类无期限表述一律视为未说明原因，PR 打回
 - 手动构造的对象通过 Factory 模式管理，禁止散落 `object` 单例
 
@@ -175,18 +173,18 @@ sealed interface UiError {
 
 ### 6.2 错误展示策略
 
-| 错误类型 | 展示方式 | 说明 |
-|---------|---------|------|
-| 网络异常 / 列表加载失败 | 全屏 `AppErrorState` | 占据内容区域，带重试按钮 |
-| 单项操作失败（复制、导入） | `Snackbar` | 不打断用户当前操作 |
-| 需要用户确认的错误 | `AlertDialog` | 如：导入冲突、数据覆盖 |
-| 非阻塞性提示 | `Snackbar` | 如：已复制、已删除 |
+| 错误类型                   | 展示方式                                                                               | 说明                     |
+| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------ |
+| 网络异常 / 列表加载失败    | 全屏错误占位组件 `AppErrorState`（〔目标态，尚未落地〕，落地前按项目现有错误占位写法） | 占据内容区域，带重试按钮 |
+| 单项操作失败（复制、导入） | `Snackbar`                                                                             | 不打断用户当前操作       |
+| 需要用户确认的错误         | `AlertDialog`                                                                          | 如：导入冲突、数据覆盖   |
+| 非阻塞性提示               | `Snackbar`                                                                             | 如：已复制、已删除       |
 
 ### 6.3 硬规则
 
 - **禁止** 在 Composable 里直接 `try-catch` 网络请求。异常在 Repository 层捕获，转成 `Result` 或 sealed class 传上来。
 - **禁止** 用 `Log.e` 代替用户可见的错误反馈。日志是给开发看的，UI 必须给用户反馈。
-- **必须** 错误状态可恢复：`AppErrorState` 必须提供重试回调，不能只展示错误不给出路。
+- **必须** 错误状态可恢复：全屏错误占位（目标态组件 `AppErrorState`，见 §6.2）必须提供重试回调，不能只展示错误不给出路。
 - **必须** Repository / ViewModel 内每个 `catch` 分支打日志，且**必须传入异常对象**（`Log.e(TAG, msg, e)`）保留完整堆栈，并带可定位上下文：实体 ID、来源 URL、操作类型。`catch (e: Exception) { Log.e(TAG, "error") }` 这种无堆栈无上下文的写法按违规打回——线上出问题时别让我盲猜。
 
 ---

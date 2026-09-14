@@ -29,7 +29,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -41,7 +40,7 @@ import androidx.core.content.edit
  * 提供一键备份功能，支持下载ZIP备份文件
  *
  * 独立于Backup.backupLocked实现，因为backupLocked会在完成后删除临时文件
- * 这里自行控制备份流程，在ZIP打包后立即读取字节数据
+ * 这里自行控制备份流程：ZIP打包到临时文件后以文件流返回，不在内存中持有整个压缩包
  */
 object BackupController {
 
@@ -80,63 +79,63 @@ object BackupController {
         appCtx.filesDir.getFile("web_backup").createFolderIfNotExist().absolutePath
     }
 
-    /** 缓存最近一次备份的ZIP字节数据 */
-    @Volatile
-    private var cachedBackupZip: ByteArray? = null
+    /** 进行中的备份任务；并发请求共享同一次备份，避免重复打包和临时目录被并发清理 */
+    private var inFlight: InFlightBackup? = null
 
     /** 缓存最近一次备份的概览信息 */
     @Volatile
     private var cachedBackupOverview: BackupOverview? = null
 
     /**
+     * 一次备份任务的共享状态，并发请求通过同一个latch等待同一次打包完成
+     */
+    private class InFlightBackup {
+        val latch = CountDownLatch(1)
+        val error = AtomicReference<Throwable?>(null)
+
+        @Volatile
+        var zipFile: File? = null
+    }
+
+    /**
      * 执行备份并返回ZIP文件
+     * 同步等待打包完成后以文件流返回；已有备份进行中时共享该次备份而不是重新打包
      */
     fun backup(): NanoHTTPD.Response {
-        val errorRef = AtomicReference<Throwable?>(null)
-        val latch = CountDownLatch(1)
-
-        backupScope.launch {
-            try {
-                val zipBytes = executeWebBackup()
-                if (zipBytes != null) {
-                    cachedBackupZip = zipBytes
-                    cachedBackupOverview = generateBackupOverview()
-                } else {
-                    errorRef.set(RuntimeException("ZIP打包失败"))
-                }
-            } catch (e: Throwable) {
-                errorRef.set(e)
-            } finally {
-                latch.countDown()
+        val flight = synchronized(this) {
+            inFlight ?: InFlightBackup().also {
+                inFlight = it
+                startBackup(it)
             }
         }
 
-        val completed = latch.await(120, TimeUnit.SECONDS)
+        //书籍缓存多时打包可能分钟级；600s内未完成先向浏览器返回超时，任务本身在后台继续，后续请求可共享其结果
+        val completed = flight.latch.await(600, TimeUnit.SECONDS)
 
         if (!completed) {
             return NanoHTTPD.newFixedLengthResponse(
                 NanoHTTPD.Response.Status.INTERNAL_ERROR,
                 "application/json",
-                GSON.toJson(ReturnData().setErrorMsg("备份超时")),
+                GSON.toJson(ReturnData().setErrorMsg("备份超时，书籍缓存较多时耗时较长，请稍后重试")),
             )
         }
 
-        val error = errorRef.get()
+        val error = flight.error.get()
         if (error != null) {
             return NanoHTTPD.newFixedLengthResponse(
                 NanoHTTPD.Response.Status.INTERNAL_ERROR,
                 "application/json",
-                GSON.toJson(ReturnData().setErrorMsg("备份失败: ${error.message}")),
+                GSON.toJson(ReturnData().setErrorMsg("备份失败: ${error.message ?: "未知错误"}")),
             )
         }
 
-        val zipBytes = cachedBackupZip
-        if (zipBytes != null && zipBytes.isNotEmpty()) {
+        val zipFile = flight.zipFile
+        if (zipFile != null && zipFile.exists() && zipFile.length() > 0) {
             return NanoHTTPD.newFixedLengthResponse(
                 NanoHTTPD.Response.Status.OK,
                 "application/zip",
-                ByteArrayInputStream(zipBytes),
-                zipBytes.size.toLong(),
+                zipFile.inputStream(),
+                zipFile.length(),
             ).apply {
                 addHeader("Content-Disposition", "attachment; filename=\"backup.zip\"")
             }
@@ -147,6 +146,31 @@ object BackupController {
             "application/json",
             GSON.toJson(ReturnData().setErrorMsg("备份文件生成失败")),
         )
+    }
+
+    /**
+     * 后台执行一次备份并回填任务状态
+     * finally 中必须先在锁内清空inFlight再countDown：保证失败/成功后新请求都能开启新备份，
+     * 且清空与置位持有同一把锁，避免出现永远等待的孤儿任务
+     */
+    private fun startBackup(flight: InFlightBackup) {
+        backupScope.launch {
+            try {
+                flight.zipFile = executeWebBackup()
+                if (flight.zipFile == null) {
+                    flight.error.set(RuntimeException("ZIP打包失败"))
+                } else {
+                    cachedBackupOverview = generateBackupOverview()
+                }
+            } catch (e: Throwable) {
+                flight.error.set(e)
+            } finally {
+                synchronized(this@BackupController) {
+                    if (inFlight === flight) inFlight = null
+                }
+                flight.latch.countDown()
+            }
+        }
     }
 
     /**
@@ -163,10 +187,10 @@ object BackupController {
     }
 
     /**
-     * 执行Web备份，返回ZIP字节数组
-     * 独立于Backup.backupLocked，自行控制备份和打包流程
+     * 执行Web备份，返回打包好的ZIP临时文件
+     * 独立于Backup.backupLocked，自行控制备份和打包流程；文件留待下次备份开始时清理
      */
-    private suspend fun executeWebBackup(): ByteArray? {
+    private suspend fun executeWebBackup(): File? {
         val aes = BackupAES()
         FileUtils.delete(webBackupPath)
 
@@ -284,9 +308,7 @@ object BackupController {
         FileUtils.delete(tempZip)
 
         if (ZipUtils.zipFiles(paths, tempZip.absolutePath)) {
-            val bytes = tempZip.readBytes()
-            FileUtils.delete(tempZip)
-            return bytes
+            return tempZip
         }
 
         return null

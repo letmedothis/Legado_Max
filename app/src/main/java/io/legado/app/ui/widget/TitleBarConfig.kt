@@ -145,13 +145,7 @@ private fun Drawable?.resolveSolidColor(): Int? {
     if (this == null) return null
     return when (this) {
         is ColorDrawable -> color
-        is GradientDrawable -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            color?.defaultColor?.takeIf { it != Color.TRANSPARENT }
-        } else {
-            // GradientDrawable.getColor() 为 API 24 新增，低版本无法读取纯色，
-            // 回退 null 让 topBarContentColor 走 getMenuColor 的默认取色
-            null
-        }
+        is GradientDrawable -> resolveGradientSolidColor()
         is LayerDrawable -> {
             var resolved: Int? = null
             for (i in 0 until numberOfLayers) {
@@ -161,6 +155,15 @@ private fun Drawable?.resolveSolidColor(): Int? {
         }
         else -> null
     }
+}
+
+/**
+ * GradientDrawable.getColor() 为 API 24 新增，函数级守卫满足 lint NewApi 检查；
+ * 低版本无法读取纯色，回退 null 让 topBarContentColor 走 getMenuColor 的默认取色
+ */
+private fun GradientDrawable.resolveGradientSolidColor(): Int? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return null
+    return color?.defaultColor?.takeIf { it != Color.TRANSPARENT }
 }
 
 /** 半透明背景色与页面背景合成，得到实际显示的底色 */

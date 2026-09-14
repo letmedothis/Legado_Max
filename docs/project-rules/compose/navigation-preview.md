@@ -1,15 +1,13 @@
 # Compose UI 规范 — 导航与 Preview
 
-> **生效范围**：`io.legado.app.ui` 包及以下所有代码
-> **本文件为原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物**：含原章节 §9、§10，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。
-> 同目录全套：`structure.md`（§1/2/3/11/12）、`state-events.md`（§4/5/6）、`theme-styles.md`（§7）、`performance.md`（§8）、`accessibility.md`（§15）、`testing.md`（§16）、`migration-review.md`（§13/14/17）。
-> **执行方式**：§14（见 `migration-review.md`）中标 [机器] 的项由 lint/Detekt/CI 规则强制，违规直接构建失败；[人工] 项 Code Review 时人工对照，不达标 PR 打回
-> **老代码策略**：分阶段迁移，允许 `@Suppress("LegadoUiViolation")` + TODO 临时过渡（见 `migration-review.md` §13）
+> 原 `UI-ARCHITECTURE.md`（2026-08-19）拆分产物：§9、§10，章节编号沿用原编号，跨文件引用按「文件名 §编号」格式书写。生效范围、执行方式、老代码策略等通用约定见 [README.md](./README.md)。
 > **最后更新**：2026-08-19
 
 ---
 
 ## 9. 导航规范
+
+> **现状**：项目尚未引入 Navigation Compose（无 `NavHost` / `NavRoute` 相关依赖）。本节是为引入导航体系时立的**先行约定**；现行页面跳转仍走 Intent / Activity，暂不按本节强规则检查，设计新导航层时必须遵循。
 
 - 路由路径**必须**集中定义（如 `object NavRoute`），**禁止**在调用点散落路由字符串字面量。
 - 路由参数**必须**通过 `navArgument` + `NavType` 定义，Screen 统一解包成 `NavArgs` 数据类（见 `migration-review.md` §17 违规 D）后使用，**禁止**在 Screen 里直接 `savedStateHandle["xxx"]` 再手动转类型。
@@ -23,7 +21,7 @@
 ### 10.1 通用组件（强制）
 
 - `ui/widget/components/` 下（跨 Feature 复用层）的**每个**公共 Composable **必须**附带至少一个 `@Preview`。
-- Preview 命名格式：`{Composable名}Preview`，如 `AppListItemPreview`。
+- Preview 命名格式：`{Composable名}Preview`，如 `AppListItemPreview`（下方示例的 `AppListItem` 为目标态组件、尚未落地，同 `structure.md` §3.1 说明）。
 - **推荐**提供多状态 Preview（正常 / 禁用 / 空数据 / 长文本截断）。
 
 ```kotlin

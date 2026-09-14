@@ -299,6 +299,8 @@ object PreferKey {
     const val highlightRuleCurrentGroup = "highlightRuleCurrentGroup"
 
     const val blockRuleItems = "exploreBlockRuleItems"
+    /** 混淆版本遗留的屏蔽规则原始 JSON 备份（恢复失败时保留，避免数据彻底丢失） */
+    const val blockRuleItemsLegacyBackup = "exploreBlockRuleItemsLegacyBackup"
     const val blockRuleGroups = "exploreBlockRuleGroups"
     const val blockRuleCurrentGroup = "exploreBlockRuleCurrentGroup"
     const val blockRuleShowProgress = "exploreBlockRuleShowProgress"

@@ -16,7 +16,8 @@
 
 ## 2. 新 API 调用的强制规则
 
-1. **`Build.VERSION.SDK_INT` 分支是默认写法，不是例外写法。**
+1. **调用新框架 API 前，先查证它是哪个 API level 开放的。** 优先查 [developer.android.com API Reference](https://developer.android.com/reference)（方法/类顶部标注 **Added in API level XX**）；官网查不到时回退 AOSP 源码或依赖库源码，别凭记忆猜。查到开放级别高于 23 的，就按下面规则写版本分支。
+2. **`Build.VERSION.SDK_INT` 分支是默认写法，不是例外写法。**
    调用任何 `@RequiresApi` 高于 23 的框架 API，必须有运行时版本判断。参考现有写法：
 
    ```kotlin
@@ -28,11 +29,11 @@
    }
    ```
 
-2. **同一逻辑的版本分支不许散落多层。** 三处以上出现同一 SDK 判断时，收进一个 Compat 对象（项目内已有先例：`lib/permission/Permissions.kt` 按 API 分支返回能力位）。散落五层的 if/else，半年后没人说得清哪条路径在线上生效。
+3. **同一逻辑的版本分支不许散落多层。** 三处以上出现同一 SDK 判断时，收进一个 Compat 对象（项目内已有先例：`lib/permission/Permissions.kt` 按 API 分支返回能力位）。散落五层的 if/else，半年后没人说得清哪条路径在线上生效。
 
-3. **禁止 `@SuppressLint("NewApi")` 当万能胶。** `NewApi` lint 是最后防线，不是让你绕过去的。`NetworkChangedListener` 里的 `@SuppressLint("UnspecifiedRegisterReceiverFlag")` 属于 API 34 注册广播必须声明 flag 的逃逸，**新代码禁止效仿**——正确做法是 `if (SDK_INT >= UPSIDE_DOWN_CAKE) registerReceiver(r, f, ContextCompat.RECEIVER_NOT_EXPORTED) else registerReceiver(r, f)`。
+4. **禁止 `@SuppressLint("NewApi")` 当万能胶。** `NewApi` lint 是最后防线，不是让你绕过去的。`NetworkChangedListener` 里的 `@SuppressLint("UnspecifiedRegisterReceiverFlag")` 属于 API 34 注册广播必须声明 flag 的逃逸，**新代码禁止效仿**——正确做法是 `if (SDK_INT >= UPSIDE_DOWN_CAKE) registerReceiver(r, f, ContextCompat.RECEIVER_NOT_EXPORTED) else registerReceiver(r, f)`。
 
-4. **分支条件写 `>=` 边界时，想清楚"低版本路径"。** 只写高版本分支、低版本静默 skip 是最常见的兼容事故（功能在 Android 6/7 上"没反应"但不 Crash，比 Crash 难查十倍）。低版本必须有：兜底行为 / 明确降级 / 明确报错三选一。
+5. **分支条件写 `>=` 边界时，想清楚"低版本路径"。** 只写高版本分支、低版本静默 skip 是最常见的兼容事故（功能在 Android 6/7 上"没反应"但不 Crash，比 Crash 难查十倍）。低版本必须有：兜底行为 / 明确降级 / 明确报错三选一。
 
 ## 3. Desugaring 覆盖范围（`desugar_jdk_libs_nio` 2.1.5）
 
@@ -57,7 +58,7 @@ targetSdk 决定平台行为，**这些在 API 23 老设备上不存在、在新
 | **Foreground Service type**（targetSdk 34+） | manifest 必须声明 `foregroundServiceType`，且启动 FGS 前持有对应权限                            | ✅ 已声明（`dataSync` × 5、`mediaPlayback` × 4，见 `AndroidManifest.xml`）。**注意：Android 15+ 对 `dataSync` 有 6 小时使用上限**，长任务（整本书下载/缓存）要考虑分段或切 `mediaPlayback`/`specialUse` 的合规性                                                                                                                                        |
 | **Edge-to-Edge 强制**（targetSdk 35+）       | 不再允许忽略系统栏 insets，所有页面（含 Dialog/BottomSheet/弹窗键盘避让）必须适配 insets        | ⚠️ 新 Compose 页面必须用 `WindowInsets` 处理；View 页面用 `fitsSystemWindows`/`setDecorFitsSystemWindows`（现有 `AndroidAlertBuilder.fixDialogWindowCompat` 是 API 30+ 分支的正面例子）。页面级 Compose 统一走 `AppScaffold`（`contentWindowInsets = 0`，内容铺满），**由内容侧自行补底部内边距**，判定依据与补法见 `compose/migration-review.md` §14.3 |
 | **POST_NOTIFICATIONS 运行时权限**（API 33+） | 通知需运行时授权                                                                                | ✅ `PermissionActivity` 已处理 TIRAMISU 分支                                                                                                                                                                                                                                                                                                            |
-| **Broadcast flag**（API 34+）                | 动态注册广播必须显式 `RECEIVER_EXPORTED` / `RECEIVER_NOT_EXPORTED`                              | ⚠️ 存量有 `SuppressLint` 逃逸，见 §2.3                                                                                                                                                                                                                                                                                                                  |
+| **Broadcast flag**（API 34+）                | 动态注册广播必须显式 `RECEIVER_EXPORTED` / `RECEIVER_NOT_EXPORTED`                              | ⚠️ 存量有 `SuppressLint` 逃逸，见 §2.4                                                                                                                                                                                                                                                                                                                  |
 
 ## 6. CI / Review 红线
 

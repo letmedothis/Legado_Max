@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.homepage
 
 import android.app.Application
+import android.os.Build
 import android.text.Html
 import androidx.lifecycle.viewModelScope
 import io.legado.app.base.BaseViewModel
@@ -615,7 +616,7 @@ class HomepageViewModel(application: Application) : BaseViewModel(application) {
                     val books = articles.map { article ->
                         // 描述规则：去除 HTML 标签得到纯文本
                         val introText = article.description?.let {
-                            Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim()
+                            htmlToPlainText(it)
                         }
                         SearchBook(
                             bookUrl = article.link,
@@ -799,7 +800,7 @@ class HomepageViewModel(application: Application) : BaseViewModel(application) {
                             originName = rssSource.sourceName,
                             name = article.title,
                             coverUrl = article.image,
-                            intro = article.description?.let { Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY).toString().trim() },
+                            intro = article.description?.let { htmlToPlainText(it) },
                             author = rssSource.sourceName,
                             latestChapterTitle = article.pubDate,
                         )
@@ -1677,4 +1678,15 @@ class HomepageViewModel(application: Application) : BaseViewModel(application) {
             notifyConfigChanged()
         }
     }
+
+    /**
+     * 去除 HTML 标签得到纯文本；fromHtml 的带 flags 版本 API 24+ 才有，低版本用单参数旧接口
+     */
+    @Suppress("DEPRECATION")
+    private fun htmlToPlainText(html: String): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY).toString().trim()
+        } else {
+            Html.fromHtml(html).toString().trim()
+        }
 }

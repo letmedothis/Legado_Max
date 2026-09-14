@@ -893,7 +893,7 @@
     <string name="export_bookshelf">匯出書單</string>
     <string name="import_bookshelf">匯入書單</string>
     <string name="pre_download">向後預下載</string>
-    <string name="pre_download_m">向後預下載%s頁</string>
+    <string name="pre_download_m">向後預下載%d頁</string>
     <string name="pre_download_s">向後預下載%s章正文</string>
     <string name="is_enabled">是否啟用</string>
     <string name="background_image">背景圖片</string>
@@ -1328,7 +1328,7 @@
     <string name="backup_selector">備份選擇器</string>
     <string name="backup_selector_summary">選擇要備份的資料</string>
     <string name="backward_pre_download">向前預下載</string>
-    <string name="backward_pre_download_s">預先下載前面的章節</string>
+    <string name="backward_pre_download_s">預先下載前面的 %s 章節</string>
     <string name="book_cache_selector">書籍快取選擇器</string>
     <string name="book_cache_selector_summary">選擇要快取的書籍</string>
     <string name="bookmark_search_book_text">搜尋書籍文字</string>

@@ -746,10 +746,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     return@setOnClickListener
                 }
                 AppConfig.cacheConcurrentRate = if (rate.isBlank()) null else rate
-                val start = alertDialog.requireViewById<android.widget.EditText>(R.id.edit_start)
-                    .text.toString().let { if (it.isEmpty()) 0 else it.toInt() }
-                val end = alertDialog.requireViewById<android.widget.EditText>(R.id.edit_end)
-                    .text.toString().let { if (it.isEmpty()) book.totalChapterNum else it.toInt() }
+                val start = alertDialog.findViewById<android.widget.EditText>(R.id.edit_start)
+                    ?.text?.toString()?.let { if (it.isEmpty()) 0 else it.toInt() } ?: 0
+                val end = alertDialog.findViewById<android.widget.EditText>(R.id.edit_end)
+                    ?.text?.toString()?.let { if (it.isEmpty()) book.totalChapterNum else it.toInt() }
+                    ?: book.totalChapterNum
                 CacheBook.start(this@ReadMangaActivity, book, start - 1, end - 1)
                 alertDialog.hide()
             }

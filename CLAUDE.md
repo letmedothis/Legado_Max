@@ -18,7 +18,7 @@ Gradle wrapper（Windows 下 `gradlew.bat`），JDK 17。常用命令（完整�
 ./gradlew assembleDebug            # Debug 构建（默认 flavor：appMax）
 ./gradlew installAppMaxDebug       # 安装到设备
 ./gradlew test                     # 单元测试
-./gradlew lint                     # Lint（CI 中也有 lint.yaml，通过视为完成的一部分）
+./gradlew lint                     # Android Lint，本地最后门禁（验证顺序：单测 → lint）
 ./gradlew app:downloadCronet       # 首次构建前必须跑，下载 Cronet 原生库
 ./gradlew assembleDebug --warning-mode all   # 查看 DSL 语法警告
 ```
@@ -61,12 +61,12 @@ The project has three library modules in `modules/`:
 - `data/` — Room DB, DAOs, repositories
 - `help/` — helpers (config managers for theme/navbar/topbar/bubble, http client, coroutine utilities, source management)
 - `lib/theme/` — theme utilities (accent colors, typography, corners, page colors, TitleBar config extensions)
-- `utils/` — Kotlin extensions (~100+ files)
+- `utils/` — Kotlin extensions (~90 files)
 - `web/` — embedded NanoHTTPD server + WebSocket endpoints
 
 ### Compose Usage
 
-Jetpack Compose (Material3, BOM 2026.08.00) is used for newer UI surfaces (e.g. debug log panel). Traditional View system (ViewBinding + XML layouts) is used for most existing screens. Both coexist — ComposeViews can be overlaid on View-based Activities.
+Jetpack Compose (Material3, BOM 2026.08.00) is used for a growing share of UI: standalone pages (Activities extending `BaseComposeActivity`, e.g. theme manage, storage manage, debug tools) and ComposeView surfaces embedded in View-based screens (home page, search, book info). The traditional View system (ViewBinding + XML layouts) remains the base of most existing screens. Both coexist long-term — ComposeViews can be overlaid on View-based Activities.
 
 Compose 规范拆分为 8 个文件，位于 `docs/project-rules/compose/`（目录结构/状态事件/主题样式/性能/导航/无障碍/测试/迁移审查，索引见 [README.md](docs/project-rules/README.md)）。**写 Compose 前先按主题读对应文件**；迁移老代码时重点对照 [`compose/migration-review.md`](docs/project-rules/compose/migration-review.md)。
 
@@ -98,7 +98,7 @@ Compose 规范拆分为 8 个文件，位于 `docs/project-rules/compose/`（目
 
 - Kotlin 代码风格遵循 Google Android Style Guide
 - 命名规则：Activity `XxxActivity`、ViewModel `XxxViewModel`、Fragment `XxxFragment`
-- 日志统一 tag 格式：`AppTag.xxx`
+- 日志 tag 统一 `AppTag.<类名>` 格式（如 `private const val TAG = "AppTag.BookInfo"`），**新代码强制**；存量已有的 TAG 常量不要求回改。此规则为**前瞻目标态**（全库尚无实例），暂不追溯存量
 
 ## Comments
 
@@ -110,7 +110,7 @@ Compose 规范拆分为 8 个文件，位于 `docs/project-rules/compose/`（目
 
 ## Dependency Management & Version Catalog
 
-- 所有依赖版本通过 `gradle/libs.versions.toml` 统一管理，在 `build.gradle.kts` 中按 `libs.xxx` 引用；禁止在 `build.gradle` 中硬编码版本号；新增依赖需同步更新版本目录文档。
+- 所有依赖版本通过 `gradle/libs.versions.toml` 统一管理，在 `build.gradle` 中按 `libs.xxx` 引用（本项目构建脚本为 Groovy，没有 .gradle.kts）；禁止硬编码版本号；新增依赖需同步更新版本目录文档。
 - 主版本与 SDK 信息（Kotlin / Hilt / OkHttp / Room / Compose BOM 等）见 [docs/project-rules/build-commands.md](docs/project-rules/build-commands.md)。
 
 ## Testing Strategy
@@ -119,9 +119,7 @@ Compose 规范拆分为 8 个文件，位于 `docs/project-rules/compose/`（目
 
 ## Build Variants
 
-三个 product flavors（维度 "app"）：`appLegacy`（`io.legado.app`，与原版同包名）、`appMax`（`io.legado.app.yuedu`，共存主开发目标）、`appS`（`io.legado.app.yuedu.a`）。
-
-minSdk 23 / targetSdk 37 / compileSdk 37 / JVM 17 toolchain；`coreLibraryDesugaring` 开启（JVM 17 语法下兼容至 API 23）。debug/release 均带 `applicationIdSuffix`（如 `io.legado.app.yuedu.debug`），Release 开启 minify + shrinkResources + ProGuard。见 [docs/project-rules/build-commands.md](docs/project-rules/build-commands.md)。
+三个 product flavors（维度 "app"）：`appLegacy`（`io.legado.app`，与原版同包名）、`appMax`（`io.legado.app.yuedu`，主开发目标）、`appS`（`io.legado.app.yuedu.a`）；debug/release 均带 `applicationIdSuffix`。SDK 版本（minSdk 23 / targetSdk 37 / compileSdk 37 / JVM 17 toolchain）、desugaring、release 混淆等完整配置见 [docs/project-rules/build-commands.md](docs/project-rules/build-commands.md)；API 兼容红线见 [api-compat-rules.md](docs/project-rules/api-compat-rules.md)。
 
 ## CI/CD
 
@@ -129,10 +127,9 @@ GitHub Actions 全部位于 `.github/workflows/`，各 workflow 的职责与触�
 
 ## Conventions
 
-- Annotation processing uses KSP, not kapt.
 - `NonTransitiveRClass` is enabled — reference only directly used resources.
 - Room schema exports to `$projectDir/schemas` for migration verification.
-- Disabled build features: aidl, renderscript, resvalues, shaders. buildConfig is explicitly enabled (Cronet version fields); do not assume BuildConfig is absent.
+- Default-disabled build features (via `gradle.properties`): resvalues, shaders. buildConfig is explicitly enabled (Cronet version fields); do not assume BuildConfig is absent.
 - Architecture documentation in `Structure/` directory (Chinese) covers app startup flow, database schema, reading flow, event bus, and module dependencies.
 
 ## Git Commit 规范
@@ -158,7 +155,7 @@ Conventional Commits 中文适配，husky + commitlint 自动校验不合规提�
 
 1. **Check Skills First**: 开始任务前，必须检查是否有匹配的 Skill。
 2. **设计先于编码** — 收到功能需求时，先检查可用的 Skill 并加载匹配项做需求分析（详见「Skill 的使用」）
-3. **测试先于实现** — 写代码前先写测试（TDD）
+3. **测试先于实现** — 写代码前先写测试（TDD）；按开发环境灵活执行，环境不允许就地跑测试时不强求（见 Testing Strategy）
 4. **验证先于完成** — 声称完成前必须运行验证命令
 5. **发现无关 bug/优化 → follow-up 报告**：任务过程中发现的 bug 或优化点，如果与当前 change 无关，不在本次修，而是作为 follow-up 报告单独提出。
 6. **任务有歧义时选最直接的理解**：不要把其他可能的理解也一起做了，只实现最直接的那个理解。

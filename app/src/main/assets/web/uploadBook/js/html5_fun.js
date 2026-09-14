@@ -162,7 +162,14 @@
                 if (XHR.readyState == 4 ){
 
                     if(XHR.status == 200){
-                        uploadSuccess(currUploadfile, {}, XHR.status)
+                        //服务端业务失败也返回HTTP 200，必须解析响应体判断真实结果
+                        var res = null;
+                        try { res = JSON.parse(XHR.responseText); } catch(e) {}
+                        if(res && res.isSuccess){
+                            uploadSuccess(currUploadfile, {}, XHR.status)
+                        }else{
+                            uploadError(res && res.errorMsg ? res.errorMsg : '保存失败')
+                        }
                     }else{
                         uploadError()
                     }
@@ -217,12 +224,12 @@
 		}
 	}
 	
-	//上传出错误了，比如断网，
-	function uploadError(){
+	//上传出错误了，比如断网，或者服务端返回业务失败
+	function uploadError(msg){
 		//移除全局变量中的，上传出错的
 		removeFileFromFilesUpload(filesUpload, currUploadfile.id);
 		var file = currUploadfile;
-		fileMap[file.name].removeClass('red').addClass('op_wrong').html('');
+		fileMap[file.name].removeClass('red').addClass('op_wrong').html(msg ? msg : '');
 	}
 	
 	
