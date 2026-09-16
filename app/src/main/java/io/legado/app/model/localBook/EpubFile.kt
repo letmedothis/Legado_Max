@@ -222,6 +222,9 @@ class EpubFile(var book: Book) {
             select("script").remove()
             select("style").remove()
         }
+        // 保留未裁剪的完整 body，供同文件但位于章节片段之外的注释目标定位
+        val fullBodyElement = bodyElement
+        resolveImageSources(fullBodyElement, res.href)
         // 获取body对应的文本
         var bodyString = bodyElement.outerHtml()
         val originBodyString = bodyString
@@ -261,22 +264,37 @@ class EpubFile(var book: Book) {
                 //getElementsMatchingOwnText(chapter.title)?.remove()
             }
         }
-        bodyElement.select("image").forEach {
+        EpubFootnoteProcessor.process(
+            body = bodyElement,
+            sourceHref = res.href,
+            resourceLoader = { targetHref ->
+                runCatching {
+                    epubBook?.resources?.getByHref(targetHref)?.let { targetResource ->
+                        Jsoup.parse(String(targetResource.data, mCharset)).body().also {
+                            resolveImageSources(it, targetResource.href)
+                        }
+                    }
+                }.onFailure {
+                    AppLog.putDebug("EPUB 注解目标加载失败: $targetHref\n${it.localizedMessage}")
+                }.getOrNull()
+            },
+            sourceResourceBody = fullBodyElement,
+        )
+        return bodyElement
+    }
+
+    /** 把 body 中的 image/img 统一成 img，并把相对图片地址解析为 EPUB 根目录相对路径。 */
+    private fun resolveImageSources(body: Element, resourceHref: String) {
+        body.select("image").forEach {
             it.tagName("img", Parser.NamespaceHtml)
             it.attr("src", it.attr("xlink:href"))
         }
-        bodyElement.select("img").forEach {
+        body.select("img").forEach {
             val src = it.attr("src").trim().encodeURI()
-            val href = res.href.encodeURI()
+            val href = resourceHref.encodeURI()
             val resolvedHref = URLDecoder.decode(URI(href).resolve(src).toString(), "UTF-8")
             it.attr("src", resolvedHref)
         }
-        EpubFootnoteProcessor.process(bodyElement, res.href) { targetHref ->
-            epubBook?.resources?.getByHref(targetHref)?.let { targetResource ->
-                Jsoup.parse(String(targetResource.data, mCharset)).body()
-            }
-        }
-        return bodyElement
     }
 
     private fun getImage(href: String): InputStream? {

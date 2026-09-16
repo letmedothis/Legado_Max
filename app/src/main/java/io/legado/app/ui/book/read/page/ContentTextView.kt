@@ -3,16 +3,26 @@ package io.legado.app.ui.book.read.page
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.text.Html
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.text.HtmlCompat
+import androidx.core.text.parseAsHtml
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
+import io.legado.app.model.localBook.EpubFootnote
 import io.legado.app.model.localBook.EpubFootnoteLink
 import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
@@ -35,6 +45,7 @@ import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.CoroutineStart
 import java.util.Collections
 import java.util.IdentityHashMap
 import java.util.concurrent.Executors
@@ -348,21 +359,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     column.linkUrl?.let {
                         val footnote = EpubFootnoteLink.decode(it)
                         if (footnote != null) {
-                            activity?.let { host ->
-                                val title = if (footnote.label.isBlank()) {
-                                    context.getString(R.string.epub_footnote)
-                                } else {
-                                    context.getString(
-                                        R.string.epub_footnote_with_label,
-                                        footnote.label
-                                    )
-                                }
-                                host.alert(title, footnote.content) {
-                                    okButton()
-                                }.findViewById<TextView>(android.R.id.message)?.apply {
-                                    setTextIsSelectable(true)
-                                }
-                            }
+                            showFootnote(footnote)
                         } else {
                             activity?.startActivity<OpenUrlConfirmActivity> {
                                 putExtra("uri", it)
@@ -374,6 +371,60 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             }
         }
         return handled
+    }
+
+    /**
+     * 弹出 EPUB 注解。富文本构建包含图片落盘/解码，走 Coroutine 链在 IO 线程完成后再回主线程显示；
+     * Activity 销毁会随 lifecycleScope 取消，关闭弹窗不影响主阅读进度。
+     */
+    private fun showFootnote(footnote: EpubFootnote) {
+        val host = activity ?: return
+        val title = if (footnote.label.isBlank()) {
+            context.getString(R.string.epub_footnote)
+        } else {
+            context.getString(R.string.epub_footnote_with_label, footnote.label)
+        }
+        Coroutine.async(scope = host.lifecycleScope, start = CoroutineStart.LAZY) {
+            buildFootnoteMessage(footnote)
+        }.onSuccess { message ->
+            showFootnoteDialog(host, title, message)
+        }.onError { error ->
+            AppLog.put("EPUB 注解富文本显示失败\n${error.localizedMessage}", error)
+            showFootnoteDialog(host, title, footnote.content)
+        }.start()
+    }
+
+    private fun showFootnoteDialog(host: AppCompatActivity, title: String, message: CharSequence) {
+        if (host.isFinishing || host.isDestroyed) return
+        host.alert(title, message) { okButton() }
+            .findViewById<TextView>(android.R.id.message)?.apply {
+                setTextIsSelectable(true)
+            }
+    }
+
+    private suspend fun buildFootnoteMessage(footnote: EpubFootnote): CharSequence {
+        if (footnote.html.isBlank()) return footnote.content
+        val book = ReadBook.book ?: return footnote.content
+        // 注解图片不在正文 DOM 中，排版阶段不会触发预取；这里先落盘到图片缓存，
+        // 随后的 ImageGetter 才能通过 ImageProvider.getImage 读到本地文件。
+        val bookSource = ReadBook.bookSource
+        EpubFootnoteLink.extractHtmlImageSources(footnote.html).forEach { src ->
+            runCatching { ImageProvider.cacheImage(book, src, bookSource) }
+        }
+        val maxWidth = resources.displayMetrics.widthPixels
+        val imageGetter = Html.ImageGetter { source ->
+            if (source.isNullOrBlank()) return@ImageGetter null
+            runCatching {
+                val bitmap = ImageProvider.getImage(book, source, maxWidth)
+                bitmap.toDrawable(resources).apply {
+                    val width = intrinsicWidth.coerceAtLeast(1)
+                    val height = intrinsicHeight.coerceAtLeast(1)
+                    val scale = if (width > maxWidth) maxWidth.toFloat() / width else 1f
+                    setBounds(0, 0, (width * scale).toInt(), (height * scale).toInt())
+                }
+            }.getOrNull()
+        }
+        return footnote.html.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, imageGetter, null)
     }
 
     /**

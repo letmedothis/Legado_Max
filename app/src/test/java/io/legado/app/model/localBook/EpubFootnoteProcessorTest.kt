@@ -28,10 +28,9 @@ class EpubFootnoteProcessorTest {
 
         assertEquals(1, converted)
         val link = body.selectFirst("a.duokan-footnote")!!
-        assertEquals(
-            EpubFootnote("[1]", "意大利的一座小岛。"),
-            EpubFootnoteLink.decode(link.attr("href"))
-        )
+        val decoded = EpubFootnoteLink.decode(link.attr("href"))!!
+        assertEquals("[1]", decoded.label)
+        assertEquals("意大利的一座小岛。", decoded.content)
         assertTrue(link.parents().any { it.tagName() == "usehtml" })
         assertNull(body.getElementById("fn1"))
         assertTrue(body.select("ol.duokan-footnote-content").isEmpty())
@@ -49,10 +48,9 @@ class EpubFootnoteProcessorTest {
         )
 
         assertEquals(1, EpubFootnoteProcessor.process(body, "EPUB/chapter.xhtml"))
-        assertEquals(
-            EpubFootnote("a", "标准脚注内容"),
-            EpubFootnoteLink.decode(body.selectFirst("a[role=doc-noteref]")!!.attr("href"))
-        )
+        val semantic = EpubFootnoteLink.decode(body.selectFirst("a[role=doc-noteref]")!!.attr("href"))!!
+        assertEquals("a", semantic.label)
+        assertEquals("标准脚注内容", semantic.content)
         assertNull(body.getElementById("note-a"))
     }
 
@@ -66,10 +64,9 @@ class EpubFootnoteProcessorTest {
         )
 
         assertEquals(1, EpubFootnoteProcessor.process(body, "Text/chapter.xhtml"))
-        assertEquals(
-            EpubFootnote("〔1〕", "静火版注解内容。"),
-            EpubFootnoteLink.decode(body.selectFirst("a.zy")!!.attr("href"))
-        )
+        val jinhuo = EpubFootnoteLink.decode(body.selectFirst("a.zy")!!.attr("href"))!!
+        assertEquals("〔1〕", jinhuo.label)
+        assertEquals("静火版注解内容。", jinhuo.content)
         assertNull(body.getElementById("id1a"))
     }
 
@@ -83,10 +80,9 @@ class EpubFootnoteProcessorTest {
         )
 
         assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
-        assertEquals(
-            EpubFootnote("1", "通用 EPUB2 注解"),
-            EpubFootnoteLink.decode(body.selectFirst("a[rel=footnote]")!!.attr("href"))
-        )
+        val epub2 = EpubFootnoteLink.decode(body.selectFirst("a[rel=footnote]")!!.attr("href"))!!
+        assertEquals("1", epub2.label)
+        assertEquals("通用 EPUB2 注解", epub2.content)
         assertNull(body.getElementById("fn1"))
     }
 
@@ -243,6 +239,136 @@ class EpubFootnoteProcessorTest {
         assertTrue(formatted.contains("legado://epub-note"))
         assertFalse(formatted.contains("<p>普通段落</p>"))
         assertTrue(formatted.contains("普通段落"))
+    }
+
+    @Test
+    fun `name anchor target without id is supported`() {
+        val body = body(
+            """
+            <p>正文<a epub:type="noteref" href="#fn1">1</a></p>
+            <p><a name="fn1"></a>name 锚点注释内容</p>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "name 锚点注释内容",
+            EpubFootnoteLink.decode(body.select("a[href]").first { EpubFootnoteLink.isFootnote(it.attr("href")) }!!.attr("href"))?.content
+        )
+    }
+
+    @Test
+    fun `semantic footnote nested below the id wrapper is supported`() {
+        val body = body(
+            """
+            <p>正文<a epub:type="noteref" href="#fn1">1</a></p>
+            <div id="fn1"><aside epub:type="footnote">后代语义注解</aside></div>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "后代语义注解",
+            EpubFootnoteLink.decode(body.select("a[href]").first { EpubFootnoteLink.isFootnote(it.attr("href")) }!!.attr("href"))?.content
+        )
+    }
+
+    @Test
+    fun `untagged reference detected by reciprocal backlink`() {
+        val body = body(
+            """
+            <p>正文<a href="#fn1" id="ref1">[1]</a></p>
+            <p id="fn1"><a href="#ref1">[1]</a> 无样式但互链的注解</p>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "无样式但互链的注解",
+            EpubFootnoteLink.decode(body.selectFirst("a#ref1")!!.attr("href"))?.content
+        )
+        assertNull(body.getElementById("fn1"))
+    }
+
+    @Test
+    fun `noteref pointing at bare aside is supported`() {
+        val body = body(
+            """
+            <p>正文<a epub:type="noteref" href="#note1">[1]</a></p>
+            <aside id="note1">裸 aside 注解</aside>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        assertEquals(
+            "裸 aside 注解",
+            EpubFootnoteLink.decode(body.select("a[href]").first { EpubFootnoteLink.isFootnote(it.attr("href")) }!!.attr("href"))?.content
+        )
+    }
+
+    @Test
+    fun `cross resource path with plus sign is not decoded to space`() {
+        val body = body("<p>正文<a epub:type=\"noteref\" href=\"ch+1.xhtml#n1\">*</a></p>")
+        var requestedHref: String? = null
+
+        val converted = EpubFootnoteProcessor.process(
+            body = body,
+            sourceHref = "EPUB/text/chapter.xhtml",
+            resourceLoader = { href ->
+                requestedHref = href
+                body("<aside id=\"n1\" epub:type=\"footnote\">加号路径注解</aside>")
+            }
+        )
+
+        assertEquals(1, converted)
+        assertEquals("EPUB/text/ch+1.xhtml", requestedHref)
+    }
+
+    @Test
+    fun `query suffix is stripped before resource lookup`() {
+        val body = body("<p>正文<a epub:type=\"noteref\" href=\"notes.xhtml?v=2#n1\">*</a></p>")
+        var requestedHref: String? = null
+
+        val converted = EpubFootnoteProcessor.process(
+            body = body,
+            sourceHref = "EPUB/chapter.xhtml",
+            resourceLoader = { href ->
+                requestedHref = href
+                body("<aside id=\"n1\" epub:type=\"footnote\">带查询串的注解</aside>")
+            }
+        )
+
+        assertEquals(1, converted)
+        assertEquals("EPUB/notes.xhtml", requestedHref)
+    }
+
+    @Test
+    fun `malformed fragment does not throw`() {
+        val body = body("<p>正文<a epub:type=\"noteref\" href=\"#100%\">*</a></p><p id=\"other\">保留</p>")
+
+        val converted = EpubFootnoteProcessor.process(body, "chapter.xhtml")
+
+        assertEquals(0, converted)
+        assertEquals("保留", body.getElementById("other")!!.text())
+    }
+
+    @Test
+    fun `note formatting is preserved as html`() {
+        val body = body(
+            """
+            <p>正文<a epub:type="noteref" href="#n1">1</a></p>
+            <aside id="n1" epub:type="footnote">
+              <p>第一段<strong>粗体</strong>与<em>斜体</em></p>
+              <ol><li>列表项</li></ol>
+            </aside>
+            """
+        )
+
+        assertEquals(1, EpubFootnoteProcessor.process(body, "chapter.xhtml"))
+        val footnote = EpubFootnoteLink.decode(body.select("a[href]").first { EpubFootnoteLink.isFootnote(it.attr("href")) }!!.attr("href"))!!
+        assertTrue(footnote.html.contains("<strong>粗体</strong>"))
+        assertTrue(footnote.html.contains("<em>斜体</em>"))
+        assertTrue(footnote.html.contains("<li>列表项</li>"))
     }
 
     private fun body(html: String): Element = Jsoup.parseBodyFragment(html).body()

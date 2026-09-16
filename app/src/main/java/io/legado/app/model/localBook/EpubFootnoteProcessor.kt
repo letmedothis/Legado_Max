@@ -2,13 +2,13 @@ package io.legado.app.model.localBook
 
 import io.legado.app.utils.HtmlFormatter
 import org.jsoup.nodes.Element
-import java.net.URI
-import java.net.URLDecoder
 
 /**
  * 将 EPUB 2/3 常见脚注结构转换为阅读器内部弹出式注释链接。
  *
  * 仅在引用和目标都能确认时改写正文；损坏或不认识的结构保持原样，避免误删书籍内容。
+ * 目标定位统一走 [EpubHrefResolver]，因此相对路径、百分号编码、Unicode/中文路径与片段
+ * 以及 name 锚点都能正确解析；任何异常链接都只跳过自身，不影响整章正文。
  */
 object EpubFootnoteProcessor {
 
@@ -40,53 +40,32 @@ object EpubFootnoteProcessor {
 
     /**
      * @param resourceLoader 按 EPUB 根目录相对路径加载目标文档 body，用于处理跨文件脚注。
+     * @param sourceResourceBody 当前 XHTML 未被章节片段裁剪前的完整 body。
+     *        章节按 fragment 裁剪后，同文件、位于裁剪范围之外的注释目标仍能在这里找到。
      * @return 成功转换的注释引用数量。
      */
     fun process(
         body: Element,
         sourceHref: String,
         resourceLoader: (String) -> Element? = { null },
+        sourceResourceBody: Element? = null,
     ): Int {
-        val sourcePath = normalizeResourceHref("", sourceHref) ?: sourceHref
+        val sourcePath = EpubHrefResolver.resolveEpubHref("", sourceHref)?.resourcePath ?: sourceHref
         val externalBodies = mutableMapOf<String, Element?>()
         val resolved = body.select("a[href]").mapNotNull { anchor ->
-            if (isBacklink(anchor)) return@mapNotNull null
-            val href = anchor.attr("href").trim()
-            val fragmentId = href.substringAfter('#', "").takeIf { it.isNotBlank() }
-                ?.let(::decodeComponent)
-                ?: return@mapNotNull null
-            val relativeTarget = href.substringBefore('#')
-            val targetPath = if (relativeTarget.isBlank()) {
-                sourcePath
-            } else {
-                normalizeResourceHref(sourcePath, relativeTarget)
-                    ?: return@mapNotNull null
-            }
-            val targetBody = if (targetPath == sourcePath) {
-                body
-            } else {
-                externalBodies.getOrPut(targetPath) { resourceLoader(targetPath) }
-                    ?: return@mapNotNull null
-            }
-            val target = targetBody.getElementById(fragmentId) ?: return@mapNotNull null
-            val noteTarget = resolveNoteTarget(target, anchor) ?: return@mapNotNull null
-            val footnoteContent = extractContent(noteTarget, anchor).takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
-            ResolvedReference(
-                anchor = anchor,
-                target = noteTarget,
-                targetIsInCurrentBody = targetBody === body,
-                footnote = EpubFootnote(
-                    label = anchor.text().trim(),
-                    content = footnoteContent,
-                ),
-            )
+            runCatching {
+                resolveReference(anchor, body, sourcePath, sourceResourceBody, resourceLoader, externalBodies)
+            }.getOrNull()
         }
 
         resolved.forEach { item ->
             item.anchor.attr(
                 "href",
-                EpubFootnoteLink.encode(item.footnote.label, item.footnote.content)
+                EpubFootnoteLink.encode(
+                    item.anchor.text().trim(),
+                    item.footnote.plain,
+                    item.footnote.html,
+                )
             )
             wrapReferenceBlock(item.anchor)
         }
@@ -97,6 +76,51 @@ object EpubFootnoteProcessor {
             .forEach(Element::remove)
         removeEmptyNoteGroups(body)
         return resolved.size
+    }
+
+    private fun resolveReference(
+        anchor: Element,
+        body: Element,
+        sourcePath: String,
+        sourceResourceBody: Element?,
+        resourceLoader: (String) -> Element?,
+        externalBodies: MutableMap<String, Element?>,
+    ): ResolvedReference? {
+        if (isBacklink(anchor)) return null
+        val hrefTarget = EpubHrefResolver.resolveEpubHref(sourcePath, anchor.attr("href").trim())
+            ?: return null
+        val fragmentId = hrefTarget.fragmentId ?: return null
+        val targetPath = hrefTarget.resourcePath
+
+        val currentTarget = if (targetPath == sourcePath) {
+            findFragmentElement(body, fragmentId)
+        } else {
+            null
+        }
+        val target = currentTarget
+            ?: if (targetPath == sourcePath) {
+                sourceResourceBody?.let { findFragmentElement(it, fragmentId) }
+            } else {
+                externalBodies.getOrPut(targetPath) {
+                    runCatching { resourceLoader(targetPath) }.getOrNull()
+                }?.let { findFragmentElement(it, fragmentId) }
+            }
+            ?: return null
+
+        val noteTarget = resolveNoteTarget(target, anchor) ?: return null
+        val content = extractContent(noteTarget, anchor)
+        if (content.plain.isBlank()) return null
+        // 目标在当前 XHTML 内才需要内联移除；若解析出的容器包含引用本身（或就是 body），
+        // 移除会连引用标记一起删掉，必须保留。
+        val shouldRemove = currentTarget != null &&
+            noteTarget !== body &&
+            anchor.parents().none { it === noteTarget }
+        return ResolvedReference(
+            anchor = anchor,
+            target = noteTarget,
+            targetIsInCurrentBody = shouldRemove,
+            footnote = content,
+        )
     }
 
     /** 在通用 HTML 净化期间保护包含注释链接的段落。 */
@@ -147,17 +171,18 @@ object EpubFootnoteProcessor {
         if (reference.hasClass("zy") && target.hasClass("hl")) {
             return target.parents().firstOrNull { it.hasClass("zs") }
         }
-        if (isIndividualNoteTarget(target)) return target
-        target.parents().firstOrNull(::isIndividualNoteTarget)?.let { return it }
+        // 目标自身、祖先或后代带有脚注/尾注语义
+        findSemanticNoteTarget(target)?.let { return it }
 
-        if (isNoteReference(reference) && reference.id().isNotBlank()) {
-            val hasReciprocalBacklink = target.select("a[href]").any {
-                it.attr("href").substringAfterLast('#') == reference.id()
-            }
-            if (hasReciprocalBacklink) {
-                return target.takeIf { it.tagName() in noteEntryTags } ?: target.parents()
-                    .firstOrNull { it.tagName() in noteEntryTags }
-            }
+        // 引用与目标互相回链：普通引用也能确认为注释（EPUB2 常见）。
+        // 这里不向父节点回退，否则反向链接自身也会被当成新的注解引用。
+        if (reference.id().isNotBlank() && hasBacklinkTo(target, reference.id())) {
+            return target.takeIf { it.tagName() in noteEntryTags }
+        }
+
+        // 引用显式声明 noteref/annoref，目标只是普通容器（如裸 aside）时按注释处理
+        if (isNoteReference(reference)) {
+            return noteEntryFor(target)
         }
 
         val noteGroup = target.parents().firstOrNull(::isNoteGroup) ?: return null
@@ -165,15 +190,48 @@ object EpubFootnoteProcessor {
             .firstOrNull { it !== noteGroup && it.tagName() in noteEntryTags }
     }
 
-    private fun extractContent(target: Element, reference: Element): String {
+    private fun findSemanticNoteTarget(target: Element): Element? {
+        if (isIndividualNoteTarget(target)) return target
+        target.parents().firstOrNull(::isIndividualNoteTarget)?.let { return it }
+        return target.getAllElements().firstOrNull { it !== target && isIndividualNoteTarget(it) }
+    }
+
+    private fun noteEntryFor(target: Element): Element {
+        if (target.tagName() in noteEntryTags) return target
+        return target.parents().firstOrNull { it.tagName() in noteEntryTags } ?: target
+    }
+
+    private fun findFragmentElement(root: Element, fragmentId: String): Element? {
+        // 兼容 EPUB2 只用 name 作为锚点的写法，例如 <a name="fn1"></a>
+        return root.getElementById(fragmentId)
+            ?: root.getElementsByAttributeValue("name", fragmentId).firstOrNull()
+    }
+
+    private fun hasBacklinkTo(target: Element, referenceId: String): Boolean {
+        return target.getAllElements().any { element ->
+            element.tagName() == "a" && element.hasAttr("href") &&
+                EpubHrefResolver.resolveEpubHref("", element.attr("href"))?.fragmentId == referenceId
+        }
+    }
+
+    private fun extractContent(target: Element, reference: Element): NoteContent {
         val clone = target.clone()
         clone.select("script, style").remove()
         clone.select("a[href]").filter { isBacklink(it, reference.id()) }.forEach(Element::remove)
-        return clone.text()
+        // 弹窗需要保证内容可见：去掉内联样式/隐藏属性，避免 CSS 把注解隐藏掉
+        clone.getAllElements().forEach { element ->
+            element.removeAttr("style")
+            element.removeAttr("hidden")
+            element.attributes().asList()
+                .filter { it.key.startsWith("on", ignoreCase = true) }
+                .forEach { element.removeAttr(it.key) }
+        }
+        val plain = clone.text()
             .replace('\u00A0', ' ')
             .replace(invisibleTextRegex, "")
             .replace(whitespaceRegex, " ")
             .trim()
+        return NoteContent(plain, clone.html().trim())
     }
 
     private fun wrapReferenceBlock(anchor: Element) {
@@ -188,30 +246,22 @@ object EpubFootnoteProcessor {
     }
 
     private fun isBacklink(link: Element, referenceId: String = ""): Boolean {
-        return link.attributeTokens("epub:type").contains("backlink") ||
+        if (link.attributeTokens("epub:type").contains("backlink") ||
             link.attributeTokens("role").contains("doc-backlink") ||
             link.attributeTokens("rel").contains("backlink") ||
             link.attributeTokens("rev").any { it in setOf("footnote", "endnote", "note") } ||
             link.hasCommonClass(
                 setOf("backlink", "footnoteback", "footnotebackref", "reversefootnote")
-            ) ||
-            referenceId.isNotBlank() &&
-            link.attr("href").substringAfterLast('#') == referenceId
+            )
+        ) {
+            return true
+        }
+        if (referenceId.isNotBlank()) {
+            val fragment = EpubHrefResolver.resolveEpubHref("", link.attr("href"))?.fragmentId
+            if (fragment == referenceId) return true
+        }
+        return false
     }
-
-    private fun normalizeResourceHref(sourceHref: String, targetHref: String): String? {
-        return runCatching {
-            val safeSource = sourceHref.replace(" ", "%20")
-            val safeTarget = targetHref.replace(" ", "%20")
-            val targetUri = URI(safeTarget)
-            if (targetUri.isAbsolute || targetUri.rawAuthority != null) return null
-            val resolved = URI(safeSource).resolve(targetUri).normalize().toString()
-            decodeComponent(resolved)
-        }.getOrNull()
-    }
-
-    private fun decodeComponent(value: String): String =
-        URLDecoder.decode(value, Charsets.UTF_8.name())
 
     private fun Element.attributeTokens(name: String): Set<String> =
         attr(name).trim().split(whitespaceRegex).filter { it.isNotBlank() }
@@ -223,10 +273,15 @@ object EpubFootnoteProcessor {
     private fun String.normalizedClassName(): String =
         lowercase().replace("-", "").replace("_", "")
 
+    private data class NoteContent(
+        val plain: String,
+        val html: String,
+    )
+
     private data class ResolvedReference(
         val anchor: Element,
         val target: Element,
         val targetIsInCurrentBody: Boolean,
-        val footnote: EpubFootnote,
+        val footnote: NoteContent,
     )
 }
