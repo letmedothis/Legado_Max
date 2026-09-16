@@ -31,9 +31,9 @@ class MarkdownDocumentParserTest {
         assertEquals(listOf("Fallback", "Chapter One", "Chapter Two"), document.sections.map { it.title })
         assertEquals(listOf(0, 1, 2), document.sections.map { it.level })
         assertEquals(listOf(null, "chapter-one", "chapter-two"), document.sections.map { it.anchor })
-        assertTrue(document.sections[1].markdown.contains("# not a chapter"))
-        assertFalse(document.sections[1].markdown.contains("Chapter Two\n-----------"))
-        assertTrue(document.sections[1].markdown.startsWith("# Chapter One"))
+        assertTrue(document.contentOf(document.sections[1]).contains("# not a chapter"))
+        assertFalse(document.contentOf(document.sections[1]).contains("Chapter Two\n-----------"))
+        assertTrue(document.contentOf(document.sections[1]).startsWith("# Chapter One"))
     }
 
     @Test
@@ -52,7 +52,7 @@ class MarkdownDocumentParserTest {
         assertEquals("A Markdown Book", document.title)
         assertEquals("Example", document.author)
         assertEquals(listOf("A Markdown Book"), document.sections.map { it.title })
-        assertEquals("Opening paragraph.", document.sections.single().markdown)
+        assertEquals("Opening paragraph.", document.contentOf(document.sections.single()).trim())
     }
 
     @Test
@@ -160,5 +160,50 @@ class MarkdownDocumentParserTest {
         assertTrue(rendered.contains("src=\"./images/"))
         assertTrue(rendered.contains("href=\"chapter/02.md#"))
         assertTrue(rendered.contains("href=\"#"))
+    }
+
+    @Test
+    fun `large markdown is split into bounded virtual chapters without reparsing source text`() {
+        listOf(1, 10, 50).forEach { megabytes ->
+            val source = buildLargeMarkdown(megabytes)
+            val document = MarkdownDocumentParser.parse(source, "Large")
+
+            assertTrue(document.sections.size > 1)
+            assertEquals(source.length, document.source.length)
+            assertTrue(document.sections.all { it.sourceEnd > it.sourceStart })
+            assertTrue(
+                document.sections.all {
+                    document.contentOf(it).length <= MarkdownDocumentParser.MAX_SECTION_CHARS + 8_192
+                }
+            )
+            assertEquals("large", document.sections.first().anchor)
+            assertTrue(document.sections.drop(1).all { it.anchor?.startsWith("large-part-") == true })
+        }
+    }
+
+    @Test
+    fun `virtual chapters retain fenced code semantics at a forced split`() {
+        val source = buildString {
+            append("# Code\n\n```kotlin\n")
+            repeat(MarkdownDocumentParser.MAX_SECTION_CHARS / 16 + 100) {
+                append("val item = \"").append(it).append("\"\n")
+            }
+            append("```\n")
+        }
+
+        val document = MarkdownDocumentParser.parse(source, "Code")
+
+        assertTrue(document.sections.size > 1)
+        assertTrue(document.contentOf(document.sections.first()).trimEnd().endsWith("```"))
+        assertTrue(document.contentOf(document.sections[1]).startsWith("```"))
+    }
+
+    private fun buildLargeMarkdown(megabytes: Int): String = buildString(megabytes * 1_024 * 1_024) {
+        append("# Large\n\n")
+        val paragraph = "- [ ] item with [link](images/a.jpg) and `code`\n"
+        while (length < megabytes * 1_024 * 1_024) {
+            append(paragraph)
+            if (length % 8_192 < paragraph.length) append('\n')
+        }
     }
 }

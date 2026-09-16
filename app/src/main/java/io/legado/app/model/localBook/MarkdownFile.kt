@@ -2,6 +2,7 @@ package io.legado.app.model.localBook
 
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.collection.LruCache
 import androidx.core.net.toUri
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -23,16 +24,17 @@ class MarkdownFile private constructor(private var book: Book) {
     companion object : BaseLocalBookParse {
         const val MARKDOWN_LEVEL = "markdownLevel"
         const val MARKDOWN_ANCHOR = "markdownAnchor"
+        const val MARKDOWN_HEADING_IN_CONTENT = "markdownHeadingInContent"
 
         private val externalLinkSchemes = setOf("http", "https", "mailto", "tel")
         private val localLinkSchemes = setOf("file", "content")
         private var markdownFile: MarkdownFile? = null
 
         @Synchronized
-        private fun getMarkdownFile(book: Book): MarkdownFile {
+        private fun getMarkdownFile(book: Book, checkModified: Boolean): MarkdownFile {
             if (markdownFile == null ||
                 markdownFile?.book?.bookUrl != book.bookUrl ||
-                book.isLocalModified()
+                (checkModified && book.isLocalModified())
             ) {
                 markdownFile = MarkdownFile(book)
             } else {
@@ -43,32 +45,32 @@ class MarkdownFile private constructor(private var book: Book) {
 
         @Synchronized
         override fun upBookInfo(book: Book) {
-            getMarkdownFile(book).upBookInfo()
+            getMarkdownFile(book, checkModified = true).upBookInfo()
         }
 
         @Synchronized
         override fun getChapterList(book: Book): ArrayList<BookChapter> {
-            return getMarkdownFile(book).getChapterList()
+            return getMarkdownFile(book, checkModified = true).getChapterList()
         }
 
         @Synchronized
         override fun getContent(book: Book, chapter: BookChapter): String? {
-            return getMarkdownFile(book).getContent(chapter)
+            return getMarkdownFile(book, checkModified = false).getContent(chapter)
         }
 
         @Synchronized
         override fun getImage(book: Book, href: String): InputStream? {
-            return getMarkdownFile(book).getImage(href)
+            return getMarkdownFile(book, checkModified = false).getImage(href)
         }
 
         @Synchronized
         fun resolveLink(book: Book, href: String): MarkdownLinkTarget {
-            return getMarkdownFile(book).resolveLink(href)
+            return getMarkdownFile(book, checkModified = false).resolveLink(href)
         }
 
         @Synchronized
         fun findChapterIndex(book: Book, anchor: String): Int? {
-            return getMarkdownFile(book).findChapterIndex(anchor)
+            return getMarkdownFile(book, checkModified = false).findChapterIndex(anchor)
         }
 
         fun clear() {
@@ -77,6 +79,9 @@ class MarkdownFile private constructor(private var book: Book) {
     }
 
     private var document: MarkdownDocument? = null
+    private val renderedContentCache = object : LruCache<Int, String>(2 * 1024 * 1024) {
+        override fun sizeOf(key: Int, value: String): Int = value.length
+    }
 
     private fun getDocument(): MarkdownDocument {
         document?.let { return it }
@@ -110,19 +115,23 @@ class MarkdownFile private constructor(private var book: Book) {
                 baseUrl = book.bookUrl,
                 bookUrl = book.bookUrl,
                 index = index,
-                wordCount = StringUtils.wordCountFormat(section.markdown.length),
+                wordCount = StringUtils.wordCountFormat(section.sourceEnd - section.sourceStart),
                 start = section.sourceStart.toLong(),
                 end = section.sourceEnd.toLong()
             ).apply {
                 putVariable(MARKDOWN_LEVEL, section.level.toString())
                 putVariable(MARKDOWN_ANCHOR, section.anchor)
+                putVariable(MARKDOWN_HEADING_IN_CONTENT, section.headingInContent.toString())
             }
         })
     }
 
     private fun getContent(chapter: BookChapter): String? {
-        val section = getDocument().sections.getOrNull(chapter.index) ?: return null
-        return MarkdownDocumentParser.render(section.markdown)
+        val document = getDocument()
+        val section = document.sections.getOrNull(chapter.index) ?: return null
+        return renderedContentCache[chapter.index] ?: MarkdownDocumentParser
+            .render(document.contentOf(section))
+            .also { renderedContentCache.put(chapter.index, it) }
     }
 
     private fun getImage(href: String): InputStream? {

@@ -25,6 +25,7 @@
 - [Github分支Suml-1](https://github.com/Suml-1/Legado_Max)
 
 **2026/9/16**
+- perf(Markdown): 优化大型本地 Markdown 的目录解析与阅读分块，降低重复转换和超大文档打开卡顿风险
 - feat(Markdown): 完善本地 `.md`/`.markdown` 阅读，支持 H1-H6 分层目录与重复标题跳转、常用 Markdown/表格排版、相对图片、当前文档锚点和同目录文档链接，并限制本地资源只能访问已授权目录
 - fix(EPUB): 修复部分本地 EPUB 的脚注/尾注/批注点击无反应或正文被隐藏的问题，兼容 name 锚点、跨文件相对路径、百分号与中文片段，并在弹窗中保留段落、粗斜体、列表与图片
 

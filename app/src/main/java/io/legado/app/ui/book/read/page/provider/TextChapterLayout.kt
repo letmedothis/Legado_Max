@@ -545,8 +545,12 @@ class TextChapterLayout(
         val imageStyle = book.getImageStyle()
         val isSingleImageStyle = imageStyle.equals(Book.imgStyleSingle, true)
 
-        val markdownHeadingInContent = book.isMarkdown &&
-            (bookChapter.getVariable(MarkdownFile.MARKDOWN_LEVEL).toIntOrNull() ?: 0) > 0
+        val markdownHeadingFlag = bookChapter.getVariable(MarkdownFile.MARKDOWN_HEADING_IN_CONTENT)
+        val markdownHeadingInContent = book.isMarkdown && (
+            markdownHeadingFlag.toBoolean() ||
+                (markdownHeadingFlag.isBlank() &&
+                    (bookChapter.getVariable(MarkdownFile.MARKDOWN_LEVEL).toIntOrNull() ?: 0) > 0)
+            )
         if ((!markdownHeadingInContent && titleMode != 2) || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
             // 标题非隐藏
