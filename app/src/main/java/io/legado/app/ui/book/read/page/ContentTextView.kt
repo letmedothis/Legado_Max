@@ -360,6 +360,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         val footnote = EpubFootnoteLink.decode(it)
                         if (footnote != null) {
                             showFootnote(footnote)
+                        } else if (callBack.onTextLinkClick(it)) {
+                            // Markdown 的当前文档锚点和同目录文档由阅读页处理；外链仍回落到
+                            // 项目原有的链接确认流程。
                         } else {
                             activity?.startActivity<OpenUrlConfirmActivity> {
                                 putExtra("uri", it)
@@ -892,5 +895,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean
         fun oldClickImg(src: String): Boolean
         fun clickImg(click: String, src: String)
+        fun onTextLinkClick(url: String): Boolean = false
     }
 }

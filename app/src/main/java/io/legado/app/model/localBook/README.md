@@ -3,7 +3,9 @@
 * BaseLocalBookParse.kt 本地书籍解析接口
 * LocalBook.kt 导入解析总入口
 * TextFile.kt 解析txt
-* MarkdownFile.kt 解析 Markdown，按标题生成目录并适配正文与本地图片
+* MarkdownDocumentParser.kt 使用现有 CommonMark/Markwon 依赖解析 Markdown，生成带 level、源码位置和唯一 anchor 的标题目录
+* MarkdownPathResolver.kt 归一化 URL 编码、Unicode、`.`/`..` 相对路径，并阻止越过已授权文件/SAF 根目录
+* MarkdownFile.kt 将 Markdown 接入本地章节、Reader 正文、相对图片、当前文档锚点和同目录 Markdown 链接
 * EpubFile.kt 解析epub，负责章节拆分、图片地址解析与注解处理入口
 * EpubHrefResolver.kt EPUB 2/3 统一内部链接解析（相对路径、百分号编码、Unicode/中文片段、查询串）
 * EpubFootnoteProcessor.kt 将 EPUB 脚注/尾注/批注结构转换为可弹出注解

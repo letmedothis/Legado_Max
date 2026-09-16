@@ -29,8 +29,11 @@ class MarkdownDocumentParserTest {
         val document = MarkdownDocumentParser.parse(markdown, "Fallback")
 
         assertEquals(listOf("Fallback", "Chapter One", "Chapter Two"), document.sections.map { it.title })
+        assertEquals(listOf(0, 1, 2), document.sections.map { it.level })
+        assertEquals(listOf(null, "chapter-one", "chapter-two"), document.sections.map { it.anchor })
         assertTrue(document.sections[1].markdown.contains("# not a chapter"))
         assertFalse(document.sections[1].markdown.contains("Chapter Two\n-----------"))
+        assertTrue(document.sections[1].markdown.startsWith("# Chapter One"))
     }
 
     @Test
@@ -53,14 +56,39 @@ class MarkdownDocumentParserTest {
     }
 
     @Test
-    fun `empty heading sections are volumes`() {
+    fun `empty heading sections remain navigable chapters`() {
         val document = MarkdownDocumentParser.parse(
             "# Part One\n\n## Chapter One\n\nBody",
             "Fallback"
         )
 
-        assertTrue(document.sections[0].isVolume)
+        assertFalse(document.sections[0].isVolume)
         assertFalse(document.sections[1].isVolume)
+    }
+
+    @Test
+    fun `heading levels and duplicate anchors are stable and unique`() {
+        val document = MarkdownDocumentParser.parse(
+            "# Java\n\n## Introduction\n\n### GC\n\n## Introduction\n\n###### 中文 标题",
+            "Fallback"
+        )
+
+        assertEquals(listOf(1, 2, 3, 2, 6), document.sections.map { it.level })
+        assertEquals(
+            listOf("java", "introduction", "gc", "introduction-2", "中文-标题"),
+            document.sections.map { it.anchor }
+        )
+        assertEquals(document.sections.map { it.sourceStart }.sorted(), document.sections.map { it.sourceStart })
+        assertTrue(document.sections.zipWithNext().all { (left, right) -> left.sourceEnd <= right.sourceStart })
+    }
+
+    @Test
+    fun `utf8 bom is ignored`() {
+        val document = MarkdownDocumentParser.parse("\uFEFF# 标题\n\n正文", "Fallback")
+
+        assertEquals("标题", document.title)
+        assertEquals("标题", document.sections.single().title)
+        assertEquals("标题", document.sections.single().anchor)
     }
 
     @Test
@@ -120,5 +148,17 @@ class MarkdownDocumentParserTest {
         assertTrue(rendered.contains("<del>removed</del>"))
         assertTrue(rendered.contains("href=\"https://example.com\""))
         assertFalse(rendered.contains("javascript:", ignoreCase = true))
+    }
+
+    @Test
+    fun `render preserves relative images and heading links`() {
+        val rendered = MarkdownDocumentParser.render(
+            "![封面](./images/%E5%B0%81%E9%9D%A2%20%E5%9B%BE.jpg)\n\n[第二章](chapter/02.md#标题)\n\n[目录](#介绍)"
+        )
+
+        assertTrue(rendered.contains("<img"))
+        assertTrue(rendered.contains("src=\"./images/"))
+        assertTrue(rendered.contains("href=\"chapter/02.md#"))
+        assertTrue(rendered.contains("href=\"#"))
     }
 }

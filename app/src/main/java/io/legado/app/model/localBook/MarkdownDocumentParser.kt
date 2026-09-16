@@ -8,6 +8,8 @@ import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import java.text.Normalizer
+import java.util.Locale
 
 internal data class MarkdownDocument(
     val title: String,
@@ -19,7 +21,10 @@ internal data class MarkdownSection(
     val title: String,
     val markdown: String,
     val level: Int,
-    val isVolume: Boolean = markdown.isBlank()
+    val anchor: String?,
+    val sourceStart: Int,
+    val sourceEnd: Int,
+    val isVolume: Boolean = false
 )
 
 /**
@@ -58,35 +63,60 @@ internal object MarkdownDocumentParser {
         val frontMatter = removeFrontMatter(normalized)
         val markdown = frontMatter.markdown
         val headings = findHeadings(markdown)
+        val anchors = uniqueAnchors(headings)
         val documentTitle = frontMatter.title
             ?: headings.firstOrNull { it.level == 1 }?.title
             ?: fallbackTitle
         val sections = ArrayList<MarkdownSection>()
 
-        val preambleEnd = headings.firstOrNull()?.startLine ?: markdown.lines().size
-        markdown.lines().subList(0, preambleEnd).joinToString("\n").trim()
+        val lines = markdown.lines()
+        val lineOffsets = lineOffsets(markdown)
+        val preambleEnd = headings.firstOrNull()?.startLine ?: lines.size
+        lines.subList(0, preambleEnd).joinToString("\n").trim()
             .takeIf { it.isNotEmpty() }
             ?.let {
-                sections.add(MarkdownSection(frontMatter.title ?: fallbackTitle, it, 0))
+                sections.add(
+                    MarkdownSection(
+                        title = frontMatter.title ?: fallbackTitle,
+                        markdown = it,
+                        level = 0,
+                        anchor = null,
+                        sourceStart = 0,
+                        sourceEnd = lineOffset(lineOffsets, preambleEnd, markdown.length)
+                    )
+                )
             }
 
-        val lines = markdown.lines()
         headings.forEachIndexed { index, heading ->
             val endLine = headings.getOrNull(index + 1)?.startLine ?: lines.size
-            val content = lines.subList(heading.endLineExclusive, endLine)
+            // 正文保留标题标记，让 H1-H6 仍由 Markdown 渲染器按层级排版；阅读器目录则使用
+            // 同一份 heading/anchor 数据跳转，避免“目录规则”和“正文定位规则”分叉。
+            val content = lines.subList(heading.startLine, endLine)
                 .joinToString("\n")
                 .trim()
             sections.add(
                 MarkdownSection(
                     title = heading.title.ifBlank { fallbackTitle },
                     markdown = content,
-                    level = heading.level
+                    level = heading.level,
+                    anchor = anchors[index],
+                    sourceStart = lineOffset(lineOffsets, heading.startLine, markdown.length),
+                    sourceEnd = lineOffset(lineOffsets, endLine, markdown.length)
                 )
             )
         }
 
         if (sections.isEmpty()) {
-            sections.add(MarkdownSection(documentTitle, markdown.trim(), 0))
+            sections.add(
+                MarkdownSection(
+                    title = documentTitle,
+                    markdown = markdown.trim(),
+                    level = 0,
+                    anchor = null,
+                    sourceStart = 0,
+                    sourceEnd = markdown.length
+                )
+            )
         }
         return MarkdownDocument(documentTitle, frontMatter.author, sections)
     }
@@ -158,7 +188,6 @@ internal object MarkdownDocumentParser {
                 headings.add(
                     Heading(
                         startLine = index,
-                        endLineExclusive = index + 1,
                         level = atx.groupValues[1].length,
                         title = cleanHeading(atx.groupValues[2].replace(Regex("[\\t ]+#+[\\t ]*$"), ""))
                     )
@@ -172,7 +201,6 @@ internal object MarkdownDocumentParser {
                 headings.add(
                     Heading(
                         startLine = index,
-                        endLineExclusive = index + 2,
                         level = if (underline.groupValues[1].first() == '=') 1 else 2,
                         title = cleanHeading(line.trim())
                     )
@@ -191,6 +219,51 @@ internal object MarkdownDocumentParser {
             .replace(Regex("\\[([^]]+)]\\([^)]*\\)"), "$1")
             .replace(Regex("[`*_~]+"), "")
         return Jsoup.parse(linksWithoutDestination).text().trim()
+    }
+
+    private fun uniqueAnchors(headings: List<Heading>): List<String> {
+        val counts = HashMap<String, Int>()
+        return headings.map { heading ->
+            val base = slugify(heading.title)
+            val count = (counts[base] ?: 0) + 1
+            counts[base] = count
+            if (count == 1) base else "$base-$count"
+        }
+    }
+
+    /** GitHub 风格的可读锚点；保留 Unicode 字母数字，重复标题由 [uniqueAnchors] 加序号。 */
+    internal fun slugify(value: String): String {
+        val normalized = Normalizer.normalize(value, Normalizer.Form.NFKC)
+            .lowercase(Locale.ROOT)
+        val result = StringBuilder(normalized.length)
+        var pendingSeparator = false
+        normalized.forEach { character ->
+            when {
+                character.isLetterOrDigit() || character == '_' -> {
+                    if (pendingSeparator && result.isNotEmpty() && result.last() != '-') {
+                        result.append('-')
+                    }
+                    result.append(character)
+                    pendingSeparator = false
+                }
+
+                character.isWhitespace() || character == '-' -> pendingSeparator = result.isNotEmpty()
+            }
+        }
+        return result.toString().trim('-').ifEmpty { "section" }
+    }
+
+    private fun lineOffsets(markdown: String): IntArray {
+        val offsets = ArrayList<Int>()
+        offsets.add(0)
+        markdown.forEachIndexed { index, character ->
+            if (character == '\n') offsets.add(index + 1)
+        }
+        return offsets.toIntArray()
+    }
+
+    private fun lineOffset(offsets: IntArray, line: Int, fallback: Int): Int {
+        return offsets.getOrNull(line) ?: fallback
     }
 
     /** Android 的 HtmlCompat 不支持表格布局，转换为保留单元格格式的逐行内容。 */
@@ -263,7 +336,6 @@ internal object MarkdownDocumentParser {
 
     private data class Heading(
         val startLine: Int,
-        val endLineExclusive: Int,
         val level: Int,
         val title: String
     )

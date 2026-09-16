@@ -12,10 +12,13 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.ItemChapterListBinding
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.ThemeUtils
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.model.localBook.MarkdownFile
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.longToastOnUi
@@ -58,6 +61,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                         && oldItem.tag == newItem.tag
                         && oldItem.wordCount == newItem.wordCount
                         && oldItem.isVolume == newItem.isVolume
+                        && oldItem.variable == newItem.variable
             }
 
         }
@@ -281,6 +285,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 tvChapterName.setTextColor(textColor)
                 tvChapterName.text = getDisplayTitle(item)
                 tvChapterName.isSingleLine = !AppConfig.tocShowFullChapterName
+                applyMarkdownIndent(item, tvChapterName)
                 if (item.isVolume) {
                     if (isCurrentVol) {
                         tvChapterItem.setBackgroundColor(context.getCompatColor(R.color.btn_bg_press))
@@ -329,9 +334,20 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     tvChapterName.text = displayTitle
                 }
                 tvChapterName.isSingleLine = !AppConfig.tocShowFullChapterName
+                applyMarkdownIndent(item, tvChapterName)
                 upHasCache(binding, isDur, cached)
             }
         }
+    }
+
+    private fun applyMarkdownIndent(item: BookChapter, titleView: android.widget.TextView) {
+        val level = if (callback.book?.isMarkdown == true) {
+            item.getVariable(MarkdownFile.MARKDOWN_LEVEL).toIntOrNull() ?: 0
+        } else {
+            0
+        }
+        val start = ((level - 1).coerceAtLeast(0) * 12).dpToPx()
+        titleView.setPaddingRelative(start, titleView.paddingTop, titleView.paddingEnd, titleView.paddingBottom)
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemChapterListBinding) {

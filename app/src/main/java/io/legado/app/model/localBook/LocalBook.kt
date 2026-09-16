@@ -280,6 +280,12 @@ object LocalBook {
         return book
     }
 
+    /** 返回已导入书籍；仅在不存在时导入，供本地文档之间的链接跳转保留原阅读进度。 */
+    fun getOrImportFile(uri: Uri): Book {
+        val bookUrl = FileDoc.fromUri(uri, false).toString()
+        return appDb.bookDao.getBook(bookUrl) ?: importFile(uri)
+    }
+
     fun upBookInfo(book: Book) {
         when {
             book.isMarkdown -> MarkdownFile.upBookInfo(book)

@@ -420,6 +420,12 @@ class HandleFileActivity :
                 when (it) {
                     "*" -> types.add("*/*")
                     "txt", "xml" -> types.add("text/*")
+                    "md", "markdown" -> {
+                        // 不同 DocumentsProvider 对 Markdown 的 MIME 标注并不一致。
+                        types.add("text/markdown")
+                        types.add("text/x-markdown")
+                        types.add("text/plain")
+                    }
                     else -> {
                         val mime = MimeTypeMap.getSingleton()
                             .getMimeTypeFromExtension(it)

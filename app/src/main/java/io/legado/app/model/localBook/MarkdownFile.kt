@@ -7,6 +7,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.getLocalUri
 import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.EncodingDetect
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.StringUtils
@@ -14,13 +15,17 @@ import io.legado.app.utils.inputStream
 import io.legado.app.utils.isContentScheme
 import splitties.init.appCtx
 import java.io.File
-import java.io.FileInputStream
 import java.io.InputStream
 
-/** 本地 Markdown 文档解析器，负责目录、正文渲染与同目录图片访问。 */
+/** 本地 Markdown 文档解析器，负责目录、正文渲染与授权范围内的相对资源、链接访问。 */
 class MarkdownFile private constructor(private var book: Book) {
 
     companion object : BaseLocalBookParse {
+        const val MARKDOWN_LEVEL = "markdownLevel"
+        const val MARKDOWN_ANCHOR = "markdownAnchor"
+
+        private val externalLinkSchemes = setOf("http", "https", "mailto", "tel")
+        private val localLinkSchemes = setOf("file", "content")
         private var markdownFile: MarkdownFile? = null
 
         @Synchronized
@@ -56,6 +61,16 @@ class MarkdownFile private constructor(private var book: Book) {
             return getMarkdownFile(book).getImage(href)
         }
 
+        @Synchronized
+        fun resolveLink(book: Book, href: String): MarkdownLinkTarget {
+            return getMarkdownFile(book).resolveLink(href)
+        }
+
+        @Synchronized
+        fun findChapterIndex(book: Book, anchor: String): Int? {
+            return getMarkdownFile(book).findChapterIndex(anchor)
+        }
+
         fun clear() {
             markdownFile = null
         }
@@ -85,80 +100,202 @@ class MarkdownFile private constructor(private var book: Book) {
         val sections = getDocument().sections
         return ArrayList(sections.mapIndexed { index, section ->
             BookChapter(
-                url = MD5Utils.md5Encode16(book.originName + index + section.title),
+                url = MD5Utils.md5Encode16(
+                    book.originName + "#" + (section.anchor ?: "preamble")
+                ),
                 title = section.title,
-                isVolume = section.isVolume,
+                // 每个 heading 都是可点击目录位置；层级存 variable，不能借用 isVolume，
+                // 否则没有正文的 heading 会被目录 UI 当成不可打开的卷名。
+                isVolume = false,
                 baseUrl = book.bookUrl,
                 bookUrl = book.bookUrl,
                 index = index,
                 wordCount = StringUtils.wordCountFormat(section.markdown.length),
-                start = index.toLong(),
-                end = (index + 1).toLong()
-            )
+                start = section.sourceStart.toLong(),
+                end = section.sourceEnd.toLong()
+            ).apply {
+                putVariable(MARKDOWN_LEVEL, section.level.toString())
+                putVariable(MARKDOWN_ANCHOR, section.anchor)
+            }
         })
     }
 
     private fun getContent(chapter: BookChapter): String? {
         val section = getDocument().sections.getOrNull(chapter.index) ?: return null
-        if (section.isVolume) return ""
         return MarkdownDocumentParser.render(section.markdown)
     }
 
     private fun getImage(href: String): InputStream? {
-        val cleanHref = href.substringBefore(",{").trim()
-        val directUri = cleanHref.toUri()
-        if (directUri.isContentScheme()) {
-            return directUri.inputStream(appCtx).getOrNull()
-        }
-        if (directUri.scheme.equals("file", ignoreCase = true)) {
-            return directUri.path?.let(::File)?.takeIf(File::isFile)?.let(::FileInputStream)
-        }
-        if (!directUri.scheme.isNullOrBlank()) return null
+        return runCatching {
+            resolveLocalUri(href.substringBefore(",{").trim())
+                ?.inputStream(appCtx)
+                ?.getOrNull()
+        }.getOrNull()
+    }
 
-        val bookUri = book.getLocalUri()
-        if (!bookUri.isContentScheme()) {
-            val parent = File(bookUri.path ?: return null).parentFile ?: return null
-            val target = File(parent, Uri.decode(cleanHref.substringBefore('#').substringBefore('?')))
-                .canonicalFile
-            return target.takeIf(File::isFile)?.let(::FileInputStream)
+    private fun resolveLink(href: String): MarkdownLinkTarget {
+        val raw = href.trim()
+        if (raw.isEmpty()) return MarkdownLinkTarget.Invalid
+        val uri = raw.toUri()
+        val scheme = uri.scheme?.lowercase()
+        if (scheme in externalLinkSchemes) return MarkdownLinkTarget.External(raw)
+        if (scheme != null && scheme !in localLinkSchemes) return MarkdownLinkTarget.Invalid
+
+        // Uri.fragment 已完成 percent decoding；再次 URLDecode 会错误处理标题中的字面 `%xx`。
+        val fragment = uri.fragment
+        val path = if (scheme == null) raw.substringBefore('#').substringBefore('?') else uri.path.orEmpty()
+        if (path.isEmpty() || (fragment != null && path.hasHtmlExtension())) {
+            return headingTarget(fragment)
         }
-        return resolveRelativeDocumentUri(bookUri, cleanHref)
-            ?.inputStream(appCtx)
-            ?.getOrNull()
+        if (!path.hasMarkdownExtension()) return MarkdownLinkTarget.Invalid
+
+        val targetUri = resolveLocalUri(raw) ?: return MarkdownLinkTarget.Invalid
+        if (sameDocument(book.getLocalUri(), targetUri)) return headingTarget(fragment)
+        return MarkdownLinkTarget.LocalDocument(
+            targetUri,
+            fragment?.let(MarkdownDocumentParser::slugify)
+        )
+    }
+
+    private fun headingTarget(fragment: String?): MarkdownLinkTarget {
+        if (fragment.isNullOrBlank()) return MarkdownLinkTarget.Heading(0)
+        val normalized = MarkdownDocumentParser.slugify(fragment)
+        val index = getDocument().sections.indexOfFirst {
+            it.anchor.equals(fragment, ignoreCase = true) || it.anchor == normalized
+        }
+        return if (index >= 0) MarkdownLinkTarget.Heading(index) else MarkdownLinkTarget.Invalid
+    }
+
+    private fun findChapterIndex(anchor: String): Int? {
+        val normalized = MarkdownDocumentParser.slugify(anchor)
+        return getDocument().sections.indexOfFirst {
+            it.anchor == normalized
+        }.takeIf { it >= 0 }
+    }
+
+    private fun resolveLocalUri(reference: String): Uri? {
+        val bookUri = book.getLocalUri()
+        val directUri = reference.toUri()
+        return when (directUri.scheme?.lowercase()) {
+            null -> resolveRelativeUri(bookUri, reference)
+            "file" -> resolveFileUri(bookUri, directUri)
+            "content" -> resolveContentUri(bookUri, directUri)
+            else -> null
+        }
+    }
+
+    private fun resolveRelativeUri(bookUri: Uri, reference: String): Uri? {
+        if (bookUri.isContentScheme()) return resolveRelativeDocumentUri(bookUri, reference)
+        val documentPath = bookUri.path ?: return null
+        val targetPath = MarkdownPathResolver.resolveFilePath(
+            allowedFileRoot(documentPath),
+            documentPath,
+            reference
+        ) ?: return null
+        return Uri.fromFile(File(targetPath))
+    }
+
+    private fun resolveFileUri(bookUri: Uri, targetUri: Uri): Uri? {
+        if (bookUri.isContentScheme()) return null
+        val documentPath = bookUri.path ?: return null
+        val targetPath = targetUri.path ?: return null
+        val root = File(allowedFileRoot(documentPath)).canonicalFile
+        val target = File(targetPath).canonicalFile
+        return target.takeIf { it.isInside(root) }?.let(Uri::fromFile)
+    }
+
+    private fun resolveContentUri(bookUri: Uri, targetUri: Uri): Uri? {
+        if (!bookUri.isContentScheme() || bookUri.authority != targetUri.authority) return null
+        return runCatching {
+            val documentId = DocumentsContract.getDocumentId(bookUri)
+            val rootId = documentRootId(bookUri, documentId)
+            val targetId = DocumentsContract.getDocumentId(targetUri)
+            if (!targetId.isDocumentIdInside(rootId)) return null
+            buildDocumentUri(bookUri, targetId)
+        }.getOrNull()
     }
 
     /**
-     * SAF 不提供父节点 API；树文档 URI 的 documentId 保留相对层级，可据此定位同目录资源。
-     * 对不暴露层级 documentId 的云盘提供方返回 null，随后由通用图片下载链路处理。
+     * SAF 没有通用父节点 API；树 URI 的 documentId 保留相对层级。路径先被归一化并限制在
+     * tree grant 内，再交给 DocumentsContract 构造目标 URI。
      */
     private fun resolveRelativeDocumentUri(bookUri: Uri, href: String): Uri? {
         return runCatching {
             if (!DocumentsContract.isDocumentUri(appCtx, bookUri)) return null
             val documentId = DocumentsContract.getDocumentId(bookUri)
-            if (!documentId.contains('/')) return null
-            val baseParts = documentId.substringBeforeLast('/').split('/').toMutableList()
-            val rootId = if (bookUri.pathSegments.contains("tree")) {
-                DocumentsContract.getTreeDocumentId(bookUri)
-            } else {
-                baseParts.first()
-            }
-            val rootParts = rootId.split('/')
-            Uri.decode(href.substringBefore('#').substringBefore('?'))
-                .replace('\\', '/')
-                .split('/')
-                .forEach { part ->
-                    when (part) {
-                        "", "." -> Unit
-                        ".." -> if (baseParts.size > rootParts.size) baseParts.removeAt(baseParts.lastIndex)
-                        else -> baseParts.add(part)
-                    }
-                }
-            val targetId = baseParts.joinToString("/")
-            if (bookUri.pathSegments.contains("tree")) {
-                DocumentsContract.buildDocumentUriUsingTree(bookUri, targetId)
-            } else {
-                DocumentsContract.buildDocumentUri(bookUri.authority, targetId)
-            }
+            val rootId = documentRootId(bookUri, documentId)
+            val targetId = MarkdownPathResolver.resolveDocumentId(rootId, documentId, href)
+                ?: return null
+            buildDocumentUri(bookUri, targetId)
         }.getOrNull()
     }
+
+    private fun documentRootId(bookUri: Uri, documentId: String): String {
+        return if (bookUri.pathSegments.contains("tree")) {
+            DocumentsContract.getTreeDocumentId(bookUri)
+        } else {
+            documentId.substringBeforeLast('/', documentId)
+        }
+    }
+
+    private fun buildDocumentUri(bookUri: Uri, documentId: String): Uri {
+        return if (bookUri.pathSegments.contains("tree")) {
+            DocumentsContract.buildDocumentUriUsingTree(bookUri, documentId)
+        } else {
+            DocumentsContract.buildDocumentUri(bookUri.authority, documentId)
+        }
+    }
+
+    private fun allowedFileRoot(documentPath: String): String {
+        val document = File(documentPath).canonicalFile
+        val configuredRoots = sequenceOf(AppConfig.importBookPath, AppConfig.defaultBookTreeUri)
+            .filterNotNull()
+            .mapNotNull { configured ->
+                runCatching {
+                    val uri = configured.toUri()
+                    if (uri.isContentScheme()) null else File(uri.path ?: configured).canonicalFile
+                }.getOrNull()
+            }
+            .filter { document.isInside(it) }
+            .toList()
+        return configuredRoots.maxByOrNull { it.path.length }?.path
+            ?: document.parentFile?.path
+            ?: document.path
+    }
+
+    private fun sameDocument(first: Uri, second: Uri): Boolean {
+        if (first.scheme.equals("file", true) && second.scheme.equals("file", true)) {
+            return runCatching { File(first.path!!).canonicalFile == File(second.path!!).canonicalFile }
+                .getOrDefault(false)
+        }
+        return first == second
+    }
+
+    private fun String.hasMarkdownExtension(): Boolean {
+        val path = substringBefore('#').substringBefore('?')
+        return path.endsWith(".md", true) || path.endsWith(".markdown", true)
+    }
+
+    private fun String.hasHtmlExtension(): Boolean {
+        return endsWith(".html", true) || endsWith(".htm", true)
+    }
+
+    private fun String.isDocumentIdInside(rootId: String): Boolean {
+        val rootSegments = rootId.replace('\\', '/').split('/').filter(String::isNotEmpty)
+        val targetSegments = replace('\\', '/').split('/').filter(String::isNotEmpty)
+        return targetSegments.none { it == "." || it == ".." } &&
+            targetSegments.size >= rootSegments.size &&
+            rootSegments.indices.all { targetSegments[it] == rootSegments[it] }
+    }
+
+    private fun File.isInside(root: File): Boolean {
+        return path == root.path || path.startsWith(root.path + File.separator)
+    }
+}
+
+sealed interface MarkdownLinkTarget {
+    data class Heading(val chapterIndex: Int) : MarkdownLinkTarget
+    data class LocalDocument(val uri: Uri, val anchor: String?) : MarkdownLinkTarget
+    data class External(val url: String) : MarkdownLinkTarget
+    data object Invalid : MarkdownLinkTarget
 }

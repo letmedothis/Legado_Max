@@ -29,6 +29,7 @@ import io.legado.app.model.ImageProvider
 import io.legado.app.model.ParagraphBubbleRenderer
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.EpubFootnoteLink
+import io.legado.app.model.localBook.MarkdownFile
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
@@ -544,7 +545,9 @@ class TextChapterLayout(
         val imageStyle = book.getImageStyle()
         val isSingleImageStyle = imageStyle.equals(Book.imgStyleSingle, true)
 
-        if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
+        val markdownHeadingInContent = book.isMarkdown &&
+            (bookChapter.getVariable(MarkdownFile.MARKDOWN_LEVEL).toIntOrNull() ?: 0) > 0
+        if ((!markdownHeadingInContent && titleMode != 2) || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
             // 标题非隐藏
             displayTitle.splitNotBlank("\n").forEach { text ->

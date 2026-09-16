@@ -69,12 +69,15 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJsonObject
 import io.legado.app.model.localBook.EpubFile
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.localBook.MarkdownFile
+import io.legado.app.model.localBook.MarkdownLinkTarget
 import io.legado.app.model.localBook.MobiFile
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.receiver.TimeBatteryReceiver
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.bookmark.BookmarkDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.changesource.ChangeChapterSourceDialog
@@ -156,6 +159,13 @@ import io.legado.app.ui.login.SourceLoginJsExtensions
 import java.text.DateFormat
 import java.text.DecimalFormat
 import java.util.Date
+
+private sealed interface MarkdownLinkOpen {
+    data class Heading(val chapterIndex: Int) : MarkdownLinkOpen
+    data class Document(val bookUrl: String, val anchor: String?) : MarkdownLinkOpen
+    data class External(val url: String) : MarkdownLinkOpen
+    data object Invalid : MarkdownLinkOpen
+}
 
 /**
  * 阅读界面
@@ -1965,6 +1975,42 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun skipToChapter(index: Int) {
         ReadBook.saveCurrentBookProgress() //退出章节跳转恢复此时进度
         viewModel.openChapter(index)
+    }
+
+    /** Markdown 内链继续走同一 Reader：锚点切章节，同目录 Markdown 导入后打开。 */
+    override fun onTextLinkClick(url: String): Boolean {
+        val sourceBook = ReadBook.book?.takeIf { it.isMarkdown } ?: return false
+        viewModel.execute {
+            when (val target = MarkdownFile.resolveLink(sourceBook, url)) {
+                is MarkdownLinkTarget.Heading -> MarkdownLinkOpen.Heading(target.chapterIndex)
+                is MarkdownLinkTarget.LocalDocument -> {
+                    val targetBook = LocalBook.getOrImportFile(target.uri)
+                    MarkdownLinkOpen.Document(targetBook.bookUrl, target.anchor)
+                }
+
+                is MarkdownLinkTarget.External -> MarkdownLinkOpen.External(target.url)
+                MarkdownLinkTarget.Invalid -> MarkdownLinkOpen.Invalid
+            }
+        }.onSuccess { target ->
+            when (target) {
+                is MarkdownLinkOpen.Heading -> viewModel.openChapter(target.chapterIndex)
+                is MarkdownLinkOpen.Document -> startActivity<ReadBookActivity> {
+                    putExtra("bookUrl", target.bookUrl)
+                    putExtra("markdownAnchor", target.anchor)
+                    putExtra("chapterChanged", true)
+                }
+
+                is MarkdownLinkOpen.External -> startActivity<OpenUrlConfirmActivity> {
+                    putExtra("uri", target.url)
+                }
+
+                MarkdownLinkOpen.Invalid -> toastOnUi(R.string.can_not_open)
+            }
+        }.onError {
+            AppLog.put("打开 Markdown 链接失败\n${it.localizedMessage}", it)
+            toastOnUi(R.string.can_not_open)
+        }
+        return true
     }
 
     /* 全文搜索跳转 */

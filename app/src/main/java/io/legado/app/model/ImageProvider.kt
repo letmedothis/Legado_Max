@@ -167,7 +167,11 @@ object ImageProvider {
                     book.isPdf -> PdfFile.getImage(book, src)
                     book.isMobi -> MobiFile.getImage(book, src)
                     book.isMarkdown -> MarkdownFile.getImage(book, src) ?: run {
-                        BookHelp.saveImage(bookSource, book, src)
+                        // 相对本地资源不存在或越过授权根目录时只显示占位图，不能把该路径
+                        // 误交给网络层，也不能让单张坏图中断整章排版。
+                        if (src.startsWith("http://", true) || src.startsWith("https://", true)) {
+                            BookHelp.saveImage(bookSource, book, src)
+                        }
                         null
                     }
                     else -> {

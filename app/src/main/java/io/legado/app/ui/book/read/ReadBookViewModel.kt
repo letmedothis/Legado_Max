@@ -20,6 +20,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
@@ -29,6 +30,7 @@ import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.localBook.MarkdownFile
 import io.legado.app.model.webBook.PartialChapterList
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
@@ -105,6 +107,13 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             if (index >= 0 && chapterPos >= 0) { //从书签打开的正文，有进度传递
                 ReadBook.saveCurrentBookProgress() //启用恢复进度提示
                 openChapter(index, chapterPos)
+            } else {
+                intent.getStringExtra("markdownAnchor")
+                    ?.let { anchor ->
+                        book?.takeIf { it.isMarkdown }
+                            ?.let { MarkdownFile.findChapterIndex(it, anchor) }
+                    }
+                    ?.let { openChapter(it) }
             }
         }.onSuccess {
             success?.invoke()
